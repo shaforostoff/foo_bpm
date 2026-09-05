@@ -17,3 +17,5 @@
 /kiss_fft/*.user
 /kiss_fft/Release
 /kiss_fft/Debug
+/dist
+/external
