@@ -1,7 +1,7 @@
 #ifndef __BPM_FFT_IMPL_kissfft_H__
 #define __BPM_FFT_IMPL_kissfft_H__
 
-#include "foobar2000/shared/shared.h"
+#include <shared/shared.h>
 
 #include "bpm_fft.h"
 

@@ -1,7 +1,7 @@
 #ifndef __BPM_FFT_H__
 #define __BPM_FFT_H__
 
-#include "pfc/pfc.h"
+#include <pfc/pfc.h>
 
 class NOVTABLE bpm_fft : public pfc::refcounted_object_root
 {

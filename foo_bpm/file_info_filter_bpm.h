@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include "foobar2000/SDK/foobar2000.h"
+#include <SDK/foobar2000.h>
 
 class file_info_filter_bpm : public file_info_filter
 {

@@ -1,7 +1,7 @@
 #ifndef __FORMAT_BPM_H__
 #define __FORMAT_BPM_H__
 
-#include "pfc/pfc.h"
+#include <pfc/pfc.h>
 
 #include "preferences.h"
 

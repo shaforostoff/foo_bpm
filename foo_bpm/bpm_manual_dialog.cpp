@@ -35,11 +35,11 @@ LRESULT bpm_manual_dialog::OnUpdateFileClicked(UINT uNotifyCode, int nID, CWindo
 {
 	metadb_handle_ptr track;
 
-	if (core_api::assert_main_thread() && static_api_ptr_t<playback_control>()->get_now_playing(track))
+	if (core_api::assert_main_thread() && playback_control::get()->get_now_playing(track))
 	{
-		static_api_ptr_t<metadb_io_v2>()->update_info_async(
+		metadb_io_v2::get()->update_info_async(
 			pfc::list_single_ref_t<metadb_handle_ptr>(track),
-			new service_impl_t<file_info_filter_bpm>(track, bpm_config_bpm_tag, m_bpm),
+			fb2k::service_new<file_info_filter_bpm>(track, bpm_config_bpm_tag, m_bpm),
 			core_api::get_main_window(),
 			metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 			NULL);

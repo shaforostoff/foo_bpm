@@ -1,7 +1,7 @@
 #ifndef __FILE_INFO_FILTER_SCALE_BPM_H__
 #define __FILE_INFO_FILTER_SCALE_BPM_H__
 
-#include "foobar2000/SDK/foobar2000.h"
+#include <SDK/foobar2000.h>
 
 class file_info_filter_scale_bpm : public file_info_filter
 {

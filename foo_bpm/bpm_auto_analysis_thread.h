@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include "foobar2000/SDK/foobar2000.h"
+#include <SDK/foobar2000.h>
 
 class bpm_auto_analysis_thread : public threaded_process_callback
 {
@@ -12,8 +12,8 @@ class bpm_auto_analysis_thread : public threaded_process_callback
 		void start();
 
 	private:
-		void run(threaded_process_status & p_status, abort_callback & p_abort);
-		void on_done(HWND p_wnd, bool p_was_aborted);
+		void run(threaded_process_status & p_status, abort_callback & p_abort) override;
+		void on_done(ctx_t p_wnd, bool p_was_aborted) override;
 
 		pfc::list_t<metadb_handle_ptr> m_tracks;
 		pfc::list_t<file_info_impl> m_infos;

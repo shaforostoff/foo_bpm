@@ -114,8 +114,9 @@ void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_cal
 	}
 }
 
-void bpm_auto_analysis_thread::on_done(HWND p_wnd, bool p_was_aborted)
+void bpm_auto_analysis_thread::on_done(ctx_t p_wnd, bool p_was_aborted)
 {
+
 	if (!p_was_aborted && core_api::assert_main_thread())
 	{
 		bpm_result_dialog* m_result_dialog = new bpm_result_dialog(m_tracks, m_infos, m_bpm_results);

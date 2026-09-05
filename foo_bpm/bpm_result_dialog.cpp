@@ -20,9 +20,9 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 {
 	if (bpm_config_auto_write_tag)
 	{
-		static_api_ptr_t<metadb_io_v2>()->update_info_async(
+		metadb_io_v2::get()->update_info_async(
 			m_tracks,
-			new service_impl_t<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
+			fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
 			core_api::get_main_window(),
 			metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 			NULL);
@@ -51,11 +51,15 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 			else
 				title_column = pfc::string_filename(m_tracks[index]->get_path());
 
-			listview_helper::insert_item(result_list, index, title_column.c_str(), 0);
+			// listview_helper indexes rows as unsigned; on a 64 bit build the
+			// loop counter is wider than that, so narrow it explicitly.
+			const unsigned row = pfc::downcast_guarded<unsigned>(index);
+
+			listview_helper::insert_item(result_list, row, title_column.c_str(), 0);
 
 			format_bpm bpm_value(m_bpm_results[index]);
 
-			listview_helper::set_item_text(result_list, index, 1, bpm_value);
+			listview_helper::set_item_text(result_list, row, 1, bpm_value);
 		}
 
 		pfc::string_formatter bpm_tag_label;
@@ -70,9 +74,9 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 
 LRESULT bpm_result_dialog::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl)
 {
-	static_api_ptr_t<metadb_io_v2>()->update_info_async(
+	metadb_io_v2::get()->update_info_async(
 		m_tracks,
-		new service_impl_t<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
+		fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
 		core_api::get_main_window(),
 		metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 		NULL);

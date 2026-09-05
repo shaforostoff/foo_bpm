@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "foobar2000/SDK/foobar2000.h"
-#include "foobar2000/helpers/helpers.h"
+#include <SDK/foobar2000.h>
+#include <helpers/helpers.h>
 
 #include "bpm_fft.h"
 
@@ -83,9 +83,6 @@ class bpm_auto_analysis
 		double sum;
 		double max_sum;
 		double estimated_bpm;
-		#ifdef X_DEBUG
-		double offset_sum;
-		#endif
 
  		double run(threaded_process_status & thread_status, abort_callback & p_abort);
 		bool read_file(double offset_pct, abort_callback &p_abort);

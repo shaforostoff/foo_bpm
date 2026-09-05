@@ -4,6 +4,21 @@ BPM Analyser for foobar2000
 Change Log
 ----------
 
+### Version 0.3.0
+
+* 64 bit support: the component now loads in 64 bit foobar2000 2.x. One
+  .fb2k-component file carries both architectures.
+* Ported from the 2011-03-11 SDK to the 2025-03-07 SDK, and from the Visual
+  Studio 2010 project files to CMake.
+* Fixed a crash analysing tracks whose decoder reports a sample rate below
+  100Hz, or hands back less audio than one FFT window.
+* Fixed the BPM tag name being read from the preferences page as ANSI into a
+  fixed size buffer: non-ASCII tag names were mangled, and a long enough name
+  overran the buffer.
+* The "output debug information" preference now controls the per-track
+  diagnostics that were previously compiled out.
+* Peak picking sorts with std::sort rather than a bubble sort.
+
 ### Version 0.2.4.6
 
 * Show tag progress window delayed

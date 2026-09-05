@@ -86,12 +86,14 @@
 
 #include "stdafx.h"
 
-#include "foobar2000/SDK/foobar2000.h"
+#include <SDK/foobar2000.h>
 
 DECLARE_COMPONENT_VERSION(
 	"BPM Analyser",
-	"0.2.4.6",
+	"0.3.0",
 	"A component for automatically analysing the BPM of audio files.\n"
+	"\n"
+	"Built against the foobar2000 SDK 2025-03-07; runs on 32 and 64 bit foobar2000.\n"
 	"\n"
 	"(c) 2009-2014 Michael Balzer (fraganator@hotmail.com)\n"
 	"(c) 2014 Holger Stenger\n"

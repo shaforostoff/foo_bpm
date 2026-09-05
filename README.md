@@ -10,31 +10,43 @@ Building
 
     .\scripts\build_release.ps1
 
-Visual Studio with the C++ workload is the only prerequisite. The script pulls
-the foobar2000 SDK and WTL into `external\` on first run, builds Release|Win32
-and writes `dist\foo_dsp_bpm.fb2k-component`.
+Visual Studio with the C++ workload, and CMake, are the only prerequisites. The
+script fetches the foobar2000 SDK and WTL into `external\` on first run, builds
+both architectures, runs the tests and writes
 
-The component is 32 bit and targets the 2011-03-11 SDK, so it loads in
-foobar2000 1.x and in the 32 bit builds of 2.x.
+    dist\foo_bpm-<version>.fb2k-component
+      foo_bpm.dll        32 bit, foobar2000 1.x and 2.x (x86)
+      x64/foo_bpm.dll    64 bit, foobar2000 2.x (x64)
+
+foobar2000 ignores subfolders it does not understand, so that single file
+installs everywhere. Symbols are packaged separately as
+`dist\foo_bpm-<version>-symbols.zip`; keep them so crash reports can be
+resolved, but do not ship them.
+
+To work on it in Visual Studio, configure once and open the generated solution:
+
+    cmake -S . -B build\x64 -A x64
+    cmake --build build\x64 --config Release
+    ctest --test-dir build\x64 -C Release
 
 ### How the build hangs together
 
 * `scripts\get_sdk.ps1` downloads the SDK and WTL, checks both against a pinned
-  SHA256 and unpacks them into `external\`. `build_release.ps1` runs it by
-  itself when they are missing, so a fresh checkout needs no manual setup.
-* The 2011 SDK predates C++11 and today's Windows SDK, so it needs help in four
-  places. Two are patches applied to the SDK as it is unpacked - both are listed
-  in `get_sdk.ps1` with the reason they exist, and each refuses to apply unless
-  it matches the pinned SDK exactly. The other two are shim headers in
-  `scripts\compat\` (`tmschema.h`, dropped from the Windows SDK after Windows 7,
-  and `afxres.h`, which ships only with the optional MFC component), so the
-  resource script and the SDK sources compile unmodified.
-* `scripts\external.props` is imported into every project of the build to put
-  WTL and those shims on the include path.
-* The project files pin the Visual Studio 2010 toolset, which no current Visual
-  Studio can install, so the build overrides it with the newest one present.
+  SHA256, and unpacks them into `external\`. CMake runs it by itself when they
+  are missing, so a fresh checkout needs no manual setup. WTL is a separate
+  download because the SDK's helpers include `<atlapp.h>` but do not ship it;
+  ATL itself comes with Visual Studio.
+* `cmake\fb2k_sdk.cmake` builds the SDK from source as four static libraries -
+  pfc, the SDK proper, libPPUI and helpers - behind the `fb2k::sdk` target.
+  This component needs the whole stack rather than the SDK core alone, because
+  it has dialogs, a preferences page and a preferences-backed tag writer.
+* `kiss_fft` is built with `kiss_fft_scalar=double` as a PUBLIC define, so the
+  library and the code including its headers cannot disagree about the layout
+  of `kiss_fft_cpx`.
+* `kiss_fft_test` verifies the half-complex packing that `bpm_fft_impl_kissfft`
+  depends on, and is wired into CTest.
 
-`external\`, `dist\` and the build output are all ignored by git.
+`build\`, `external\` and `dist\` are all ignored by git.
 
 References
 ----------

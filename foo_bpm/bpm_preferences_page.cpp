@@ -237,16 +237,10 @@ void bpm_preferences_page::OnBnClicked(UINT uNotifyCode, int nID, CWindow wndCtl
 void bpm_preferences_page::apply()
 {
 	CComboBox bpm_combo_box;
-	char a_bpm_tag[256];
-	wchar_t w_bpm_tag[256];
-	unsigned w_length = 0;
-	unsigned a_length = 0;
 
-	w_length = GetDlgItemText(ID_CONFIG_BPM_TAG, w_bpm_tag, 256) + 1;
-	a_length = pfc::stringcvt::estimate_wide_to_ansi(w_bpm_tag, w_length);
-	bpm_config_bpm_tag.prealloc(a_length);
-	pfc::stringcvt::convert_wide_to_ansi(a_bpm_tag, a_length, w_bpm_tag, w_length);
-	bpm_config_bpm_tag = a_bpm_tag;
+	pfc::string8 bpm_tag;
+	uGetDlgItemText(*this, ID_CONFIG_BPM_TAG, bpm_tag);
+	bpm_config_bpm_tag = bpm_tag;
 
 	bpm_config_seconds_to_read = GetDlgItemInt(ID_CONFIG_SECONDS_TO_READ, NULL, false);
 	bpm_config_num_bpms_to_calc = GetDlgItemInt(ID_CONFIG_NUM_BPMS_TO_CALC, NULL, false);
@@ -294,24 +288,18 @@ bool bpm_preferences_page::HasChanged()
 	bool changed = false;
 
 	CComboBox bpm_combo_box;
-	char a_bpm_tag[256];
-	wchar_t w_bpm_tag[256];
-	unsigned w_length = 0;
-	unsigned a_length = 0;
 
-	w_length = GetDlgItemText(ID_CONFIG_BPM_TAG, w_bpm_tag, 256) + 1;
-	a_length = pfc::stringcvt::estimate_wide_to_ansi(w_bpm_tag, w_length);
-	bpm_config_bpm_tag.prealloc(a_length);
-	pfc::stringcvt::convert_wide_to_ansi(a_bpm_tag, a_length, w_bpm_tag, w_length);
-	if (strcmp(bpm_config_bpm_tag, a_bpm_tag) != 0 ||
-		bpm_config_seconds_to_read != GetDlgItemInt(ID_CONFIG_SECONDS_TO_READ, NULL, false) ||
-		bpm_config_num_bpms_to_calc != GetDlgItemInt(ID_CONFIG_NUM_BPMS_TO_CALC, NULL, false) ||
-		bpm_config_offset_pct_min != GetDlgItemInt(ID_CONFIG_OFFSET_PCT_MIN, NULL, false) ||
-		bpm_config_offset_pct_max != GetDlgItemInt(ID_CONFIG_OFFSET_PCT_MAX, NULL, false) ||
-		bpm_config_bpm_min != GetDlgItemInt(ID_CONFIG_BPM_MIN, NULL, false) ||
-		bpm_config_bpm_max != GetDlgItemInt(ID_CONFIG_BPM_MAX, NULL, false) ||
-		bpm_config_taps_to_average != GetDlgItemInt(ID_CONFIG_TAPS_TO_AVERAGE, NULL, false) ||
-		bpm_config_seconds_to_reset_average != GetDlgItemInt(ID_CONFIG_SECONDS_TO_RESET_AVERAGE, NULL, false) ||
+	pfc::string8 bpm_tag;
+	uGetDlgItemText(*this, ID_CONFIG_BPM_TAG, bpm_tag);
+	if (strcmp(bpm_config_bpm_tag, bpm_tag) != 0 ||
+		bpm_config_seconds_to_read != (int) GetDlgItemInt(ID_CONFIG_SECONDS_TO_READ, NULL, false) ||
+		bpm_config_num_bpms_to_calc != (int) GetDlgItemInt(ID_CONFIG_NUM_BPMS_TO_CALC, NULL, false) ||
+		bpm_config_offset_pct_min != (int) GetDlgItemInt(ID_CONFIG_OFFSET_PCT_MIN, NULL, false) ||
+		bpm_config_offset_pct_max != (int) GetDlgItemInt(ID_CONFIG_OFFSET_PCT_MAX, NULL, false) ||
+		bpm_config_bpm_min != (int) GetDlgItemInt(ID_CONFIG_BPM_MIN, NULL, false) ||
+		bpm_config_bpm_max != (int) GetDlgItemInt(ID_CONFIG_BPM_MAX, NULL, false) ||
+		bpm_config_taps_to_average != (int) GetDlgItemInt(ID_CONFIG_TAPS_TO_AVERAGE, NULL, false) ||
+		bpm_config_seconds_to_reset_average != (int) GetDlgItemInt(ID_CONFIG_SECONDS_TO_RESET_AVERAGE, NULL, false) ||
 		bpm_config_interpolate_flux != (IsDlgButtonChecked(ID_CONFIG_INTERPOLATE_FLUX) == BST_CHECKED) ||
 		bpm_config_output_debug != (IsDlgButtonChecked(ID_CONFIG_OUTPUT_DEBUG) == BST_CHECKED) ||
 		bpm_config_auto_write_tag != (IsDlgButtonChecked(ID_CONFIG_AUTO_WRITE_TAG) == BST_CHECKED))

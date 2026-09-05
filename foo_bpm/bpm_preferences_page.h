@@ -1,8 +1,8 @@
 #ifndef __BPM_PREFERENCES_PAGE_H__
 #define __BPM_PREFERENCES_PAGE_H__
 
-#include "foobar2000/SDK/foobar2000.h"
-#include "foobar2000/ATLHelpers/ATLHelpers.h"
+#include <SDK/foobar2000.h>
+#include <helpers/atl-misc.h>
 
 #include "resource.h"
 

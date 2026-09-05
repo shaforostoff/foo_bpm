@@ -1,164 +1,146 @@
 <#
 .SYNOPSIS
-    Builds foo_bpm in the Release configuration and packages it as an
-    installable .fb2k-component in dist\.
+    Builds foo_bpm for every requested architecture and packages the result as
+    an installable .fb2k-component in dist\.
 
 .DESCRIPTION
-    Pulls the build prerequisites if they are not there yet, drives MSBuild
-    over foo_bpm.sln (Release|Win32 - the only configuration the project
-    defines) and zips the resulting DLL into
+    Configures and builds with CMake, runs the test suite, then assembles one
+    archive holding both architectures:
 
-        dist\foo_dsp_bpm.fb2k-component
-          foo_bpm.dll
+        foo_bpm-<version>.fb2k-component
+          foo_bpm.dll        <- 32 bit, foobar2000 1.x and 2.x (x86)
+          x64/foo_bpm.dll    <- 64 bit, foobar2000 2.x (x64)
 
-    The foobar2000 SDK and WTL are fetched by scripts\get_sdk.ps1 into
-    external\, so a fresh checkout builds with nothing but Visual Studio
-    installed. Run that script by hand only when you want -Force.
+    foobar2000 ignores subfolders it does not understand, so one file installs
+    everywhere. Debug symbols go into a separate archive that is NOT part of
+    the component - keep it so foobar2000 crash reports can be resolved.
 
-    The DLL name inside the archive is fixed: foo_bpm.cpp calls
-    VALIDATE_COMPONENT_FILENAME("foo_bpm.dll") and foobar2000 refuses to load
-    the component under any other name. The archive name is free-form, so
-    -Name only changes the file you hand out.
+    The DLL is named foo_bpm.dll on both architectures because foo_bpm.cpp
+    asserts that name with VALIDATE_COMPONENT_FILENAME; only the archive name
+    carries the version.
 
-    This is a 32 bit component built against the 2011-03-11 SDK, so it loads in
-    foobar2000 1.x and in the 32 bit builds of 2.x.
+    The SDK and WTL are fetched on the first configure; see scripts\get_sdk.ps1.
 
-.PARAMETER Name
-    Base name of the .fb2k-component file. Default: foo_dsp_bpm.
+.PARAMETER Arch
+    Which architectures to build. Default: x86 and x64.
 
-.PARAMETER Toolset
-    MSVC platform toolset, e.g. v142. Default: the newest one installed.
+.PARAMETER Configuration
+    CMake configuration. Default: Release.
 
-    This is always passed to MSBuild, never left alone: the SDK's own projects
-    and kiss_fft.vcxproj pin PlatformToolset to v100 (Visual Studio 2010),
-    which no current Visual Studio can install, so the build only gets off the
-    ground with the pin overridden.
+.PARAMETER SkipTests
+    Do not run the verification harness. Not recommended.
 
 .PARAMETER Clean
-    Rebuild from scratch instead of building incrementally.
+    Wipe the build directories first.
 
 .EXAMPLE
     .\scripts\build_release.ps1
 
 .EXAMPLE
-    .\scripts\build_release.ps1 -Clean -Name foo_bpm
+    .\scripts\build_release.ps1 -Arch x64 -Clean
 #>
 
 [CmdletBinding()]
 param(
-    [string] $Name = 'foo_dsp_bpm',
-    [string] $Toolset = '',
-    [switch] $Clean
+    [ValidateSet('x86', 'x64')]
+    [string[]] $Arch = @('x86', 'x64'),
+    [string]   $Configuration = 'Release',
+    [switch]   $SkipTests,
+    [switch]   $Clean
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$root       = Split-Path -Parent $PSScriptRoot
-$solution   = Join-Path $root 'foo_bpm.sln'
-$distDir    = Join-Path $root 'dist'
-$component  = Join-Path $distDir "$Name.fb2k-component"
+$root    = Split-Path -Parent $PSScriptRoot
+$distDir = Join-Path $root 'dist'
+$stage   = Join-Path $root 'build\_package'
+$symbols = Join-Path $root 'build\_symbols'
 
-# --- prerequisites ----------------------------------------------------------
-# foo_bpm.sln and foo_bpm.vcxproj reference the SDK and WTL under external\;
-# get_sdk.ps1 puts them there. It is a no-op once the stamp files are in place,
-# so this costs one Test-Path on every later build.
-if (-not (Test-Path (Join-Path $root 'external\foobar2000_sdk\foobar2000\SDK\foobar2000.h')) -or
-    -not (Test-Path (Join-Path $root 'external\wtl\Include\atlapp.h'))) {
-    Write-Host "`n=== Prerequisites ===" -ForegroundColor Cyan
-    & (Join-Path $PSScriptRoot 'get_sdk.ps1')
+function Invoke-Checked([string] $what, [scriptblock] $action) {
+    & $action
+    if ($LASTEXITCODE -ne 0) { throw "$what failed with exit code $LASTEXITCODE" }
 }
 
-function Find-MSBuild {
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-    if (Test-Path $vswhere) {
-        $found = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
-                            -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
-        if ($found) { return $found }
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+    throw 'cmake was not found on PATH. Install CMake 3.21 or newer, or run this from a Developer PowerShell.'
+}
+
+# --- version, straight out of the project so the archive name cannot drift ---
+$cmakeLists = Get-Content (Join-Path $root 'CMakeLists.txt') -Raw
+if ($cmakeLists -notmatch '(?m)^\s*VERSION\s+([0-9]+(?:\.[0-9]+)*)') {
+    throw 'Could not read VERSION out of CMakeLists.txt'
+}
+$version = $Matches[1]
+Write-Host "foo_bpm $version" -ForegroundColor Cyan
+
+foreach ($dir in @($stage, $symbols)) {
+    if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+}
+New-Item -ItemType Directory -Force $stage, $symbols, $distDir | Out-Null
+
+foreach ($a in $Arch) {
+    $platform = if ($a -eq 'x64') { 'x64' } else { 'Win32' }
+    $buildDir = Join-Path $root "build\$a"
+
+    if ($Clean -and (Test-Path $buildDir)) { Remove-Item -Recurse -Force $buildDir }
+
+    Write-Host "`n=== Configuring $a ===" -ForegroundColor Cyan
+    Invoke-Checked "cmake configure ($a)" {
+        & cmake -S $root -B $buildDir -A $platform
     }
-    $onPath = Get-Command msbuild.exe -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
-    throw 'MSBuild not found. Install Visual Studio with the C++ workload, or run this from a Developer PowerShell.'
-}
 
-# The vcxproj files predate the toolset they will actually be built with, so
-# work out the newest installed one and override their v100 pin with it.
-function Find-DefaultToolset {
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-    if (Test-Path $vswhere) {
-        $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-                              -property installationPath | Select-Object -First 1
-        if ($install) {
-            $newest = Get-ChildItem (Join-Path $install 'VC\Tools\MSVC') -Directory -ErrorAction SilentlyContinue |
-                          Sort-Object { [version] $_.Name } -Descending | Select-Object -First 1
-            if ($newest) {
-                $v = [version] $newest.Name
-                switch ("{0}.{1}" -f $v.Major, $v.Minor) {
-                    '14.1'  { return 'v141' }
-                    '14.2'  { return 'v142' }
-                    default { return 'v143' }   # 14.3 and 14.4 are both v143
-                }
-            }
+    Write-Host "`n=== Building $a ===" -ForegroundColor Cyan
+    Invoke-Checked "cmake build ($a)" {
+        & cmake --build $buildDir --config $Configuration --parallel
+    }
+
+    if (-not $SkipTests) {
+        Write-Host "`n=== Testing $a ===" -ForegroundColor Cyan
+        Invoke-Checked "ctest ($a)" {
+            & ctest --test-dir $buildDir -C $Configuration --output-on-failure
         }
     }
-    return 'v143'
+
+    # 32 bit goes at the archive root, 64 bit in x64\ - that is the layout
+    # foobar2000 2.x expects, and 1.x simply ignores the subfolder.
+    $subdir = if ($a -eq 'x64') { Join-Path $stage 'x64' } else { $stage }
+    New-Item -ItemType Directory -Force $subdir | Out-Null
+
+    $built = Join-Path $buildDir "foo_bpm\$Configuration\foo_bpm.dll"
+    if (-not (Test-Path $built)) { throw "Expected output missing: $built" }
+    Copy-Item $built $subdir -Force
+
+    $pdb = [System.IO.Path]::ChangeExtension($built, '.pdb')
+    if (Test-Path $pdb) {
+        $symDir = Join-Path $symbols $a
+        New-Item -ItemType Directory -Force $symDir | Out-Null
+        Copy-Item $pdb $symDir -Force
+    }
+
+    Write-Host ("  foo_bpm.dll  {0,-4} {1,9:N0} bytes" -f $a, (Get-Item $built).Length) -ForegroundColor Green
 }
 
-$msbuild = Find-MSBuild
-if (-not $Toolset) { $Toolset = Find-DefaultToolset }
-Write-Host "MSBuild: $msbuild" -ForegroundColor DarkGray
-Write-Host "Toolset: $Toolset" -ForegroundColor DarkGray
-
-# --- build ------------------------------------------------------------------
-# Release|Win32 is the only configuration foo_bpm.vcxproj defines; the solution
-# maps its x64 entries onto Win32 as well.
-Write-Host "`n=== Building foo_bpm (Release|Win32) ===" -ForegroundColor Cyan
-# Build the foo_bpm target rather than the whole solution: that pulls in the
-# five SDK libraries and kiss_fft through the project references, and leaves
-# out kiss_fft_test, whose C++98 custom allocator no longer satisfies
-# std::vector and which has nothing to do with the component.
-$targets = if ($Clean) { 'foo_bpm:Rebuild' } else { 'foo_bpm' }
-$msbuildArgs = @($solution,
-                 "/t:$targets",
-                 '/p:Configuration=Release',
-                 '/p:Platform=Win32',
-                 "/p:PlatformToolset=$Toolset",
-                 "/p:ForceImportBeforeCppTargets=$(Join-Path $PSScriptRoot 'external.props')",
-                 '/m',
-                 '/nologo',
-                 '/v:minimal')
-
-& $msbuild @msbuildArgs
-if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
-
-# --- locate the DLL ---------------------------------------------------------
-# The projects leave OutDir at its default, which for Win32 is
-# $(SolutionDir)$(Configuration)\ - but fall back to a search so a local
-# .user.props that moves it does not break packaging.
-$dll = Join-Path $root 'Release\foo_bpm.dll'
-if (-not (Test-Path $dll)) {
-    $dll = Get-ChildItem $root -Recurse -Filter 'foo_bpm.dll' -File -ErrorAction SilentlyContinue |
-               Where-Object { $_.FullName -notmatch '\(Debug|dist|external)\' } |
-               Sort-Object LastWriteTime -Descending |
-               Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $dll) { throw 'Build reported success but foo_bpm.dll was not found.' }
-
-# --- package ----------------------------------------------------------------
+# --- package ---------------------------------------------------------------
+# cmake -E tar produces the same zip on every PowerShell version, and CMake is
+# already a hard dependency here.
 Write-Host "`n=== Package ===" -ForegroundColor Cyan
-New-Item -ItemType Directory -Force $distDir | Out-Null
-if (Test-Path $component) { Remove-Item -Force $component }
+$componentPath = Join-Path $distDir "foo_bpm-$version.fb2k-component"
+$symbolsPath   = Join-Path $distDir "foo_bpm-$version-symbols.zip"
+foreach ($p in @($componentPath, $symbolsPath)) {
+    if (Test-Path $p) { Remove-Item -Force $p }
+}
 
-# Compress-Archive insists on a .zip destination, so build one and rename it -
-# a .fb2k-component is a plain zip.
-$zip = Join-Path $distDir "$Name.zip"
-if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path $dll -DestinationPath $zip -CompressionLevel Optimal
-Move-Item $zip $component
+Invoke-Checked "packaging the component" {
+    & cmake -E chdir $stage cmake -E tar cf $componentPath --format=zip .
+}
+Invoke-Checked "packaging the symbols" {
+    & cmake -E chdir $symbols cmake -E tar cf $symbolsPath --format=zip .
+}
 
-$built = Get-Item $dll
-Write-Host ("  foo_bpm.dll  {0:N0} bytes  ({1:yyyy-MM-dd HH:mm})" -f $built.Length, $built.LastWriteTime) -ForegroundColor DarkGray
-Write-Host ("  {0}  ({1:N0} bytes)" -f $component, (Get-Item $component).Length) -ForegroundColor Green
+Write-Host ("  {0}  ({1:N0} bytes)" -f $componentPath, (Get-Item $componentPath).Length) -ForegroundColor Green
+& cmake -E tar tf $componentPath | ForEach-Object { Write-Host "      $_" }
+Write-Host ("  {0}  ({1:N0} bytes)" -f $symbolsPath, (Get-Item $symbolsPath).Length) -ForegroundColor DarkGray
 
 Write-Host @"
 

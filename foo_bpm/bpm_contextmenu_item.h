@@ -1,7 +1,7 @@
 #ifndef __BPM_CONTEXTMENU_ITEM_H__
 #define __BPM_CONTEXTMENU_ITEM_H__
 
-#include "foobar2000/SDK/foobar2000.h"
+#include <SDK/foobar2000.h>
 
 class bpm_contextmenu_item : public contextmenu_item_simple
 {

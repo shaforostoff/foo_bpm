@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "bpm_auto_analysis.h"
 #include "preferences.h"
-#include "foo_bpm.h"
+#include "bpm_math.h"
+
+using namespace bpm_math;
 
 /***** BPM Analysis *****/
 
@@ -15,7 +17,7 @@ bpm_auto_analysis::bpm_auto_analysis(metadb_handle_ptr p_track):
 	// Do some checks to make sure the input settings are OK
 	if (offset_pct_min > offset_pct_max)
 	{
-		swap(offset_pct_min, offset_pct_max);
+		std::swap(offset_pct_min, offset_pct_max);
 	}
 	else if (offset_pct_min == offset_pct_max)
 	{
@@ -51,7 +53,7 @@ bpm_auto_analysis::bpm_auto_analysis(metadb_handle_ptr p_track):
 	// Do some checks to make sure the input settings are OK
 	if (bpm_min > bpm_max)
 	{
-		swap(bpm_min, bpm_max);
+		std::swap(bpm_min, bpm_max);
 	}
 	else if (bpm_min == bpm_max)
 	{
@@ -69,9 +71,6 @@ bpm_auto_analysis::bpm_auto_analysis(metadb_handle_ptr p_track):
 	sum = 0;
 	max_sum = 0;
 	estimated_bpm = 0;
-	#ifdef X_DEBUG
-	offset_sum = 0;
-	#endif
 	candidate_selection = bpm_config_candidate_selection;
 }
 
@@ -88,7 +87,7 @@ double bpm_auto_analysis::run_safe(threaded_process_status & thread_status, abor
 	}
 	catch (const std::exception &exc)
 	{
-		console::formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ": " << exc;
+		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ": " << exc;
 		return 0.0;
 	}
 }
@@ -104,7 +103,7 @@ double bpm_auto_analysis::run(threaded_process_status & thread_status, abort_cal
 	if (m_track->get_length() < seconds_to_read)
 	{
 		thread_status.set_progress_secondary(max_progress, max_progress);
-		console::formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Track length too short. BPM set to zero.";
+		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Track length too short. BPM set to zero.";
 		return 0;
 	}
 
@@ -135,7 +134,13 @@ double bpm_auto_analysis::run(threaded_process_status & thread_status, abort_cal
 		if (p_abort.is_aborting()) break;
 	}
 
-	bpm_list = bubble_sort(bpm_list);
+	std::sort(bpm_list.begin(), bpm_list.end());
+
+	// Aborting before the first pass completes leaves nothing to choose from.
+	if (bpm_list.empty())
+	{
+		return 0;
+	}
 
 	switch (candidate_selection)
 	{
@@ -153,13 +158,13 @@ double bpm_auto_analysis::run(threaded_process_status & thread_status, abort_cal
 
 	if (bpm_config_output_debug)
 	{
-		console::formatter() << "\n";
-		console::formatter() << "foo_bpm: Estimated BPMs (sorted) for " << pfc::string_filename_ext(m_track->get_path()) << " are:";
+		FB2K_console_formatter() << "\n";
+		FB2K_console_formatter() << "foo_bpm: Estimated BPMs (sorted) for " << pfc::string_filename_ext(m_track->get_path()) << " are:";
 		for (unsigned i = 0; i < bpm_list.size(); i++)
-			console::formatter() << "BPM " << i+1 << " = " << bpm_list[i];
+			FB2K_console_formatter() << "BPM " << i+1 << " = " << bpm_list[i];
 
-		console::formatter() << "foo_bpm: Calculated BPM = " << bpm_result;
-		console::formatter() << "\n";
+		FB2K_console_formatter() << "foo_bpm: Calculated BPM = " << bpm_result;
+		FB2K_console_formatter() << "\n";
 	}
 
 	return bpm_result;
@@ -175,7 +180,7 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 
 	if (!input_file.is_open())
 	{
-		console::formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". File could not be opened for analysis";
+		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". File could not be opened for analysis";
 		return false;
 	}
 
@@ -185,14 +190,14 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 	}
 	else
 	{
-		console::formatter() << "foo_bpm: Warning - Failed to seek file " << m_track->get_path() << ". BPM result will be of first " << seconds_to_read << " seconds only.";
+		FB2K_console_formatter() << "foo_bpm: Warning - Failed to seek file " << m_track->get_path() << ". BPM result will be of first " << seconds_to_read << " seconds only.";
 	}
 
 	// Grab and ignore the first chunk as it will most likely have an odd sample chunk size
 	// TODO: Handle case where we reach EOF (run() returns false)
 	if (!input_file.run(chunk, p_abort))
 	{
-		console::formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Unexpected end of file found.";
+		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Unexpected end of file found.";
 		return false;
 	}
 
@@ -201,11 +206,12 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 
 	max_samples = sample_rate*seconds_to_read;
 
-	#ifdef DEBUG
-	console::formatter() << "\n\n\nFile path: " << input_file.get_path();
-	console::formatter() << "Sample rate: " << sample_rate << "Hz";
-	console::formatter() << "Num channels: " << channel_count;
-	#endif
+	if (bpm_config_output_debug)
+	{
+		FB2K_console_formatter() << "\n\n\nFile path: " << input_file.get_path();
+		FB2K_console_formatter() << "Sample rate: " << sample_rate << "Hz";
+		FB2K_console_formatter() << "Num channels: " << channel_count;
+	}
 
 	// Reset the audio buffer before filling it
 	audio_buffer.resize(0);
@@ -219,9 +225,6 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 		sample_count = chunk.get_sample_count();
 		data_ptr = chunk.get_data();
 
-		#ifdef X_DEBUG
-		console::formatter() << "Chunk size: " << sample_count;
-		#endif
 
 		// Increase buffer size by sample_count, but only if necessary
 		if (audio_buffer.capacity() <= audio_buffer.size() + sample_count)
@@ -248,10 +251,11 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 		}
 	}
 
-	#ifdef DEBUG
-	console::formatter() << "Buffer size is " << audio_buffer.size();
-	console::formatter() << "Allocated size is " << audio_buffer.capacity();
-	#endif
+	if (bpm_config_output_debug)
+	{
+		FB2K_console_formatter() << "Buffer size is " << audio_buffer.size();
+		FB2K_console_formatter() << "Allocated size is " << audio_buffer.capacity();
+	}
 
 	return true;
 }
@@ -263,8 +267,28 @@ void bpm_auto_analysis::calc_stft()
 		// Human hearing can only determine difference of 10ms ([1])
 		fft_window_slide = sample_rate/100;
 	}
-	// Work out the number of sliding windows available
-	num_fft_windows = (int)((audio_buffer.size() - fft_window_size) / fft_window_slide) + 1; // BUG: Divide by 0 - #24710, #24506. My hunch is playlist info is not yet available, so sample_rate has a value of zero.
+
+	// A sample rate under 100Hz makes the automatic slide zero, and the
+	// subtraction below underflows if the decoder handed us less audio than one
+	// window. Either one used to crash the analysis outright (#24710, #24506).
+	if (fft_window_slide < 1)
+	{
+		fft_window_slide = 1;
+	}
+	// Work out the number of sliding windows available. Every stage after this
+	// one, and clean_up(), is written around num_fft_windows, so a shortfall is
+	// recorded as zero windows rather than returning early - that keeps every
+	// allocation matched with its delete.
+	if (audio_buffer.size() < static_cast<size_t>(fft_window_size))
+	{
+		num_fft_windows = 0;
+		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path()
+		                         << ". Not enough audio decoded for one FFT window. BPM set to zero.";
+	}
+	else
+	{
+		num_fft_windows = (int)((audio_buffer.size() - fft_window_size) / fft_window_slide) + 1;
+	}
 	// Work out number of seconds we're actually processing
 	seconds_in_fft = (double)(fft_window_slide * (num_fft_windows - 1) + fft_window_size) / (double)sample_rate;
 	// stft is a 2D array of num_fft_windows by fft_bin_size
@@ -316,37 +340,12 @@ void bpm_auto_analysis::calc_stft()
 		}
 	}
 
-	#ifdef X_DEBUG
-	ofstream audio_file;
-	audio_file.open(audio_path.c_str(), ios::out);
-	for (unsigned i = 0; i < audio_buffer.size(); i++)
-	{
-		audio_file << audio_buffer[i];
-		if (i != audio_buffer.size() - 1)
-			audio_file << "\t";
-	}
-	audio_file.close();
-
-	ofstream stft_file;
-	stft_file.open(stft_path.c_str(), ios::out);
-	for (int i = 0; i < num_fft_windows; i++)
-	{
-		for (int j = 0; j < fft_bin_size; j++)
-		{
-			stft_file << stft[i][j];
-			if (j != fft_bin_size - 1)
-				stft_file << "\t";
-		}
-		stft_file << "\n";
-	}
-	stft_file.close();
-	#endif
 }
 
 void bpm_auto_analysis::calc_spectral_flux()
 {
 	spectral_flux = new double[num_fft_windows];
-	initialise_array(spectral_flux, num_fft_windows);
+	std::fill_n(spectral_flux, num_fft_windows, 0.0);
 
 	for (int fft_window = 0; fft_window < num_fft_windows; fft_window++)
 	{
@@ -382,24 +381,13 @@ void bpm_auto_analysis::calc_spectral_flux()
 		//spectral_flux[fft_window-1] = (spectral_flux[fft_window-1] + abs(spectral_flux[fft_window-1]))/2;
 	}
 
-	#ifdef X_DEBUG
-	ofstream flux_file;
-	flux_file.open(flux_path.c_str(), ios::out);
-	for (int i = 0; i < num_fft_windows; i++)
-	{
-		flux_file << spectral_flux[i];
-		if (i != num_fft_windows - 1)
-			flux_file << "\t";
-	}
-	flux_file.close();
-	#endif
 }
 
 void bpm_auto_analysis::pick_peaks()
 {
 	median_window = new double[median_window_size];
 	peaks = new double[num_fft_windows];
-	initialise_array(peaks, num_fft_windows);
+	std::fill_n(peaks, num_fft_windows, 0.0);
 
 	if (do_peak_picking)
 	{
@@ -440,23 +428,12 @@ void bpm_auto_analysis::pick_peaks()
 				}
 			}
 			
-			bubble_sort(median_window, actual_median_window_size);
+			std::sort(median_window, median_window + actual_median_window_size);
 
 			if (spectral_flux[fft_window] > (median_window[actual_median_window_size/2] * flux_constant + flux_rms))
 				peaks[fft_window] = spectral_flux[fft_window];
 		}
 
-		#ifdef X_DEBUG
-		ofstream peak_file;
-		peak_file.open(peak_path.c_str(), ios::out);
-		for (int i = 0; i < num_fft_windows; i++)
-		{
-			peak_file << peaks[i];
-			if (i != num_fft_windows - 1)
-				peak_file << "\t";
-		}
-		peak_file.close();
-		#endif
 	}
 }
 
@@ -464,6 +441,14 @@ void bpm_auto_analysis::calc_bpm()
 {
 	double tempo_inc = 1;
 	max_sum = 0;
+
+	// With no windows there is nothing to correlate, and seconds_in_fft is zero,
+	// which would turn the tempo offset below into a NaN.
+	if (num_fft_windows < 1 || seconds_in_fft <= 0)
+	{
+		bpm_list.push_back(0);
+		return;
+	}
 
 	switch (bpm_precision)
 	{
@@ -481,9 +466,6 @@ void bpm_auto_analysis::calc_bpm()
 	{
 		tempo_offset_size = (double)num_fft_windows * (60/tempo) / seconds_in_fft;
 		tempo_comparisons = (int)tempo_offset_size;
-		#ifdef X_DEBUG
-		offset_sum = 0;
-		#endif
 
 		for (int tempo_offset = 0; tempo_offset < tempo_comparisons; tempo_offset++)
 		{
@@ -540,30 +522,18 @@ void bpm_auto_analysis::calc_bpm()
 				estimated_bpm = tempo;
 			}
 
-			#ifdef X_DEBUG
-			if (sum > offset_sum)
-				offset_sum = sum;
-			#endif
 		}
 
-		#ifdef X_DEBUG
-		console::formatter() << "Tested BPM: " << tempo << ", sum is " << offset_sum << ", max sum is " << max_sum;
-		#endif
 	}
 
 	bpm_list.push_back(estimated_bpm);
 
-	#ifdef DEBUG
-	console::formatter() << "Num FFT windows: " << num_fft_windows;
-	console::formatter() << "Seconds in FFT: " << seconds_in_fft;
-	#endif
+	if (bpm_config_output_debug)
+	{
+		FB2K_console_formatter() << "Num FFT windows: " << num_fft_windows;
+		FB2K_console_formatter() << "Seconds in FFT: " << seconds_in_fft;
+	}
 
-	#ifdef X_DEBUG
-	ofstream bpm_file;
-	bpm_file.open(bpm_path.c_str(), ios::out);
-	bpm_file << estimated_tempo;
-	bpm_file.close();
-	#endif
 }
 
 void bpm_auto_analysis::clean_up()

@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "bpm_contextmenu_item.h"
 #include "guid.h"
-#include "foo_bpm.h"
+#include "globals.h"
 #include "bpm_auto_analysis_thread.h"
 #include "bpm_manual_dialog.h"
 #include "file_info_filter_scale_bpm.h"
@@ -110,7 +110,7 @@ bool bpm_contextmenu_item::get_item_description(unsigned p_index, pfc::string_ba
 
 void bpm_contextmenu_item::run_auto_analysis(metadb_handle_list_cref p_data)
 {
-	service_ptr_t<bpm_auto_analysis_thread> thread = new service_impl_t<bpm_auto_analysis_thread>(p_data);
+	service_ptr_t<bpm_auto_analysis_thread> thread = fb2k::service_new<bpm_auto_analysis_thread>(p_data);
 	thread->start();
 }
 
@@ -123,9 +123,9 @@ void bpm_contextmenu_item::run_manual_analysis(metadb_handle_list_cref p_data)
 
 void bpm_contextmenu_item::run_scale_bpm(metadb_handle_list_cref p_data, double p_scale)
 {
-	static_api_ptr_t<metadb_io_v2>()->update_info_async(
+	metadb_io_v2::get()->update_info_async(
 		p_data,
-		new service_impl_t<file_info_filter_scale_bpm>(bpm_config_bpm_tag, p_scale),
+		fb2k::service_new<file_info_filter_scale_bpm>(bpm_config_bpm_tag, p_scale),
 		core_api::get_main_window(),
 		metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 		NULL);

@@ -5,8 +5,8 @@
 #include "globals.h"
 #include "guid.h"
 
-#include "foobar2000/SDK/foobar2000.h"
-#include "foobar2000/ATLHelpers/ATLHelpers.h"
+#include <SDK/foobar2000.h>
+#include <helpers/atl-misc.h>
 
 typedef enum
 {
