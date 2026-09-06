@@ -50,7 +50,7 @@ analysis analyse(const float * mono, std::size_t count, unsigned sample_rate,
 
 	result.beat_bpm = lag_to_bpm(g.beat_lag, o.frame_rate);
 	result.meter = g.meter;
-	result.bpm = tapped_bpm(acf, g.beat_lag, result.rhythm, o.frame_rate);
+	result.bpm = tapped_bpm(acf, g.beat_lag, result.rhythm, g.meter, o.frame_rate);
 	result.ok = result.bpm > 0;
 
 	if (l != nullptr) l->progress(1.0);

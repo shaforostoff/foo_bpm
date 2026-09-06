@@ -18,7 +18,7 @@ if(POLICY CMP0091)
 endif()
 
 project(foo_bpm
-        VERSION 0.4.0
+        VERSION 0.4.1
         DESCRIPTION "BPM Analyser for foobar2000"
         LANGUAGES C CXX)   # kiss_fft is C
 

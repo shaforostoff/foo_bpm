@@ -71,8 +71,11 @@ grid find_grid(const std::vector<double> & acf, double frame_rate);
 //! Sharpen a beat period against every harmonic of itself at once.
 double refine_period(const std::vector<double> & acf, double lag0);
 //! Choose the metrical level the user would have tapped, given the rhythm.
+//!
+//! `meter` is only consulted for `rhythm_other`, which has no tapping
+//! convention of its own; the three tango rhythms carry their own level set.
 double tapped_bpm(const std::vector<double> & acf, double beat_lag, int rhythm,
-                  double frame_rate);
+                  int meter, double frame_rate);
 
 double lag_to_bpm(double lag, double frame_rate);
 double bpm_to_lag(double bpm, double frame_rate);

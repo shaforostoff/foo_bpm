@@ -143,7 +143,7 @@ namespace
 
 			double conf = 0;
 			const int cls = bpmcore::classify(features, &conf);
-			bpmcore::tapped_bpm(acf, g.beat_lag, cls, o.frame_rate);
+			bpmcore::tapped_bpm(acf, g.beat_lag, cls, g.meter, o.frame_rate);
 			auto t6 = now();
 
 			t_odf = std::min(t_odf, secs(t0, t1));

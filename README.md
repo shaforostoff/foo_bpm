@@ -12,7 +12,7 @@ The two answers are linked. The tempo a dancer taps is not a property of the
 audio by itself: a tango is tapped on the beat, a vals once per 3/4 bar, a
 milonga once per 2/4 bar. So the rhythm is settled first and the tempo reported
 on the level that rhythm implies. Measured against 3,664 hand-tapped tracks the
-estimate lands within 2 BPM of the tap 88.5% of the time, which is about as
+estimate lands within 2 BPM of the tap 89.0% of the time, which is about as
 close as the same person tapping the same track twice; rhythm classification is
 94% accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method
 and the full numbers.

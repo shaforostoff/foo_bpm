@@ -126,9 +126,20 @@ prior cannot pull a tempo towards its mean. That separation is deliberate: the
 priors are tight (tango is 125.5 with a log sigma of 0.075) and would otherwise
 flatten every tango to the same number.
 
-"Other" is the exception. It spans bossa to disco to chacarera and has no useful
-tempo prior, so there the autocorrelation is weighted nearly four times as
-heavily and the prior only breaks ties.
+**The levels on offer have to be levels of the metre.** Two beats is not a
+metrical position in a 3/4 bar, and while it was offered a slow vals could be
+reported at the two-beat rate instead of the bar: a Peruvian vals at 56 to the
+bar sits below anything the Argentine prior expects, so the prior stops
+defending the right answer and a spurious two-beat periodicity wins. Removing
+that one level took vals from 90.5% to 94.1% within 2 BPM.
+
+"Other" is the exception in two ways. It spans bossa to disco to chacarera and
+has no useful tempo prior, so the autocorrelation is weighted nearly four times
+as heavily and the prior only breaks ties. And because the class states no metre
+of its own, the level set follows the metre the grid search found — duple or
+triple — rather than allowing both. Allowing both is what let a son cubano be
+read at two thirds of its beat: *Chan Chan* came out at 112 and *Guantanamera*
+at 83, neither of which is a rate anything in those recordings moves at.
 
 A constant **+0.5 BPM** is added at the end. Taps run marginally ahead of the
 measured pulse across the whole collection; this is a calibration to that habit,
@@ -163,17 +174,17 @@ BPM against the 3,664 hand-tapped tracks, using the **predicted** rhythm:
 | rhythm  |   n  | exact | ≤1 BPM | ≤2 BPM | ≤3 BPM | right level |
 |---------|-----:|------:|-------:|-------:|-------:|------------:|
 | tango   | 2732 | 34.6% |  74.6% |  88.4% |  93.8% |       98.3% |
-| vals    |  455 | 42.6% |  83.7% |  90.5% |  91.0% |       91.4% |
+| vals    |  455 | 43.5% |  86.4% |  94.1% |  94.5% |       94.9% |
 | milonga |  425 | 41.4% |  81.2% |  88.2% |  89.2% |       89.2% |
-| other   |   52 | 34.6% |  69.2% |  78.8% |  80.8% |       82.7% |
-| **all** | 3664 | 36.4% |  76.4% |  88.5% |  92.7% |       96.2% |
+| other   |   52 | 34.6% |  71.2% |  80.8% |  82.7% |       84.6% |
+| **all** | 3664 | 36.5% |  76.8% |  89.0% |  93.2% |       96.6% |
 
 Set against the tap-to-tap repeatability above (68% within 1, 84% within 2, 93%
 within 3), the estimator agrees with a tap about as closely as the same person
 tapping twice.
 
 The rhythm classifier is what buys most of this. Skipping it and treating every
-track as a tango gives 66.9% within 2 BPM instead of 88.5%.
+track as a tango gives 66.9% within 2 BPM instead of 89.0%.
 
 ### Where it still misses
 
@@ -185,10 +196,14 @@ track as a tango gives 66.9% within 2 BPM instead of 88.5%.
 * **Milonga recall, 83%.** Milonga is the smallest class and shades into
   candombe and *milonga tangueada*, which are genuinely intermediate.
 * **"Other" tempo.** With 52 tapped examples spanning Glenn Miller to Daft Punk
-  there is no convention to learn. Interestingly the *predicted* rhythm does
-  better here than the true one (78.8% vs 63.5% within 2 BPM): the candombes
-  tagged "other" get classified as milonga, and the milonga prior then puts them
-  on the level they were actually tapped on.
+  there is no convention to learn, and what is left is an octave choice with
+  nothing to settle it: *Bitter Sweet Symphony* and *La Tanga* have beats within
+  1 BPM of each other and were tapped at opposite levels, 85 and 171. Both
+  readings are defensible and the engine can only be right about one of them.
+  Interestingly the *predicted* rhythm does better here than the true one (80.8%
+  vs 65.4% within 2 BPM): the candombes tagged "other" get classified as
+  milonga, and the milonga prior then puts them on the level they were actually
+  tapped on.
 * **Beat search floor, ~96 BPM.** Eight multiples of the beat have to fit inside
   the five-second autocorrelation. Every rhythm here sits well above that — a
   tango beat is 110–140, a vals beat around 205 — but a genuinely slow piece is
