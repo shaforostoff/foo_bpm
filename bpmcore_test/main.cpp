@@ -7,6 +7,10 @@
 //       feed stored feature vectors straight to the classifier and check the
 //       exported trees reproduce the class and probability scikit-learn gave.
 //
+//   resample
+//       check the resampler, and that one synthesised track analyses the same
+//       at every input rate. Needs no audio on disk.
+//
 //   pipeline <raw f32 mono file> <sample rate>
 //       run the whole chain and print the result, for comparison against the
 //       Python reference implementation the model was developed with.
@@ -162,6 +166,168 @@ namespace
 		return 0;
 	}
 
+	const double test_pi = 3.14159265358979323846;
+
+	//! A band-limited beat pattern, evaluated from time rather than sampled, so
+	//! the same music can be produced at any rate.
+	//!
+	//! Every partial is under 4kHz and every envelope is smooth, so the highest
+	//! rate here and the lowest represent it identically - which is what lets a
+	//! cross-rate difference be blamed on the analysis rather than on the signal.
+	void synth_beats(std::vector<float> & out, unsigned rate, double seconds,
+	                 double beat_bpm, int meter)
+	{
+		const std::size_t n = static_cast<std::size_t>(seconds * rate);
+		const double beat = 60.0 / beat_bpm;
+		// One partial per band, so mix_bands has something in each of the six.
+		const double partials[6] = { 80.0, 300.0, 640.0, 1000.0, 2200.0, 4000.0 };
+		const double weights[6]  = { 1.00, 0.45, 0.40, 0.30, 0.25, 0.18 };
+		out.assign(n, 0.0f);
+		for (std::size_t i = 0; i < n; i++)
+		{
+			const double t = static_cast<double>(i) / rate;
+			const double into = std::fmod(t, beat);
+			if (into >= 0.12) continue;
+			// Raised cosine in, exponential out: continuous, with a continuous
+			// derivative at both ends, so the spectrum decays fast.
+			const double env = 0.5 * (1.0 - std::cos(2.0 * test_pi * into / 0.12))
+			                   * std::exp(-12.0 * into);
+			double v = 0;
+			for (int b = 0; b < 6; b++)
+				v += weights[b] * std::sin(2.0 * test_pi * partials[b] * t);
+			const long index = static_cast<long>(t / beat);
+			const double accent = (index % meter) == 0 ? 1.0 : 0.55;
+			out[i] = static_cast<float>(0.3 * accent * env * v);
+		}
+	}
+
+	void synth_sine(std::vector<float> & out, unsigned rate, double seconds, double hz)
+	{
+		const std::size_t n = static_cast<std::size_t>(seconds * rate);
+		out.assign(n, 0.0f);
+		for (std::size_t i = 0; i < n; i++)
+			out[i] = static_cast<float>(std::sin(2.0 * test_pi * hz * i / rate));
+	}
+
+	//! RMS of the middle half, which leaves out the filter's transient at each end.
+	double middle_rms(const std::vector<float> & x)
+	{
+		if (x.size() < 8) return 0.0;
+		const std::size_t lo = x.size() / 4, hi = x.size() - x.size() / 4;
+		double sum = 0;
+		for (std::size_t i = lo; i < hi; i++) sum += static_cast<double>(x[i]) * x[i];
+		return std::sqrt(sum / (hi - lo));
+	}
+
+	std::vector<float> convert(unsigned from, unsigned to,
+	                           const std::vector<float> & in, std::size_t block)
+	{
+		bpmcore::resampler rs(from, to);
+		std::vector<float> out;
+		if (!rs.valid() || block == 0) return out;
+		out.reserve(rs.expected_output(in.size()));
+		for (std::size_t at = 0; at < in.size(); at += block)
+			rs.process(in.data() + at, std::min(block, in.size() - at), out);
+		rs.flush(out);
+		return out;
+	}
+
+	//! Checks the resampler, and the rate independence it buys.
+	//!
+	//! Every signal is synthesised here rather than read from disk, which is the
+	//! point: this runs in CI with no audio to hand.
+	int run_resample()
+	{
+		int failures = 0;
+		int checks = 0;
+		auto check = [&](bool ok, const char * what)
+		{
+			checks++;
+			if (!ok) { std::fprintf(stderr, "resample: %s\n", what); failures++; }
+		};
+
+		// Which rates reproduce the model's analysis untouched.
+		const unsigned exact[] = { 11025, 22050, 44100, 88200, 176400 };
+		for (std::size_t i = 0; i < sizeof(exact) / sizeof(exact[0]); i++)
+			check(bpmcore::rate_matches_model(exact[i]), "an exact rate was thought inexact");
+		const unsigned inexact[] = { 0, 8000, 16000, 24000, 32000, 48000, 96000, 192000, 44056 };
+		for (std::size_t i = 0; i < sizeof(inexact) / sizeof(inexact[0]); i++)
+			check(!bpmcore::rate_matches_model(inexact[i]), "an inexact rate was thought exact");
+
+		// Blocking must not change a sample. Each output reads the same
+		// coefficients against the same input whatever the block size, so this is
+		// an equality and not a tolerance.
+		std::vector<float> beats;
+		synth_beats(beats, 48000, 3.0, 124.0, 4);
+		const std::vector<float> whole = convert(48000, 22050, beats, beats.size());
+		check(!whole.empty(), "48kHz could not be converted at all");
+		const std::size_t blocks[] = { 1, 7, 577, 4096 };
+		for (std::size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++)
+			check(convert(48000, 22050, beats, blocks[i]) == whole,
+			      "streaming and one-shot conversion differ");
+
+		// The output has to cover the input's duration, to the sample.
+		const bpmcore::resampler geometry(48000, 22050);
+		check(whole.size() == geometry.expected_output(beats.size()),
+		      "converted length is not the expected length");
+		check(std::fabs(static_cast<double>(whole.size()) / 22050.0 -
+		                static_cast<double>(beats.size()) / 48000.0) <= 1.0 / 22050.0,
+		      "converted duration does not match the input duration");
+
+		// Flat to the top band edge, which is as high as the envelope reads.
+		const double pass_hz[] = { 100.0, 1000.0, 5000.0, 7900.0 };
+		for (std::size_t i = 0; i < sizeof(pass_hz) / sizeof(pass_hz[0]); i++)
+		{
+			std::vector<float> sine;
+			synth_sine(sine, 48000, 2.0, pass_hz[i]);
+			const double gain = middle_rms(convert(48000, 22050, sine, 8192)) / middle_rms(sine);
+			std::printf("  %7.0fHz  passband gain %.5f\n", pass_hz[i], gain);
+			check(std::fabs(gain - 1.0) <= 0.01, "the passband is not flat");
+		}
+
+		// An alias of anything above the stopband edge has to land far enough
+		// below the signal to be invisible to a log-compressed flux.
+		const double stop_hz[] = { 15000.0, 18000.0, 21000.0 };
+		for (std::size_t i = 0; i < sizeof(stop_hz) / sizeof(stop_hz[0]); i++)
+		{
+			std::vector<float> sine;
+			synth_sine(sine, 48000, 2.0, stop_hz[i]);
+			const double gain = middle_rms(convert(48000, 22050, sine, 8192)) / middle_rms(sine);
+			const double db = 20.0 * std::log10(gain > 1e-12 ? gain : 1e-12);
+			std::printf("  %7.0fHz  alias %7.1f dB\n", stop_hz[i], db);
+			check(db <= -70.0, "an alias was not rejected");
+		}
+
+		// What the whole exercise is for: one recording, six rates, one answer.
+		// 48kHz used to be read through a 42.7ms window where the geometry asks
+		// for 46.4ms, which moved the classifier and the metre with it.
+		const unsigned rates[] = { 22050, 32000, 44100, 48000, 88200, 96000 };
+		bpmcore::analysis reference;
+		for (std::size_t i = 0; i < sizeof(rates) / sizeof(rates[0]); i++)
+		{
+			std::vector<float> audio;
+			synth_beats(audio, rates[i], 40.0, 124.0, 4);
+			bpmcore::options opt; opt.threads = 1;
+			const bpmcore::analysis a =
+				bpmcore::analyse(audio.data(), audio.size(), rates[i], nullptr, &opt);
+			std::printf("  %6uHz  %7.3f BPM  %-8s p=%.3f  beat %7.3f  metre %d\n",
+			            rates[i], a.bpm, bpmcore::rhythm_name(a.rhythm), a.confidence,
+			            a.beat_bpm, a.meter);
+			check(a.ok, "a rate failed to analyse");
+			if (!a.ok) continue;
+			if (i == 0) { reference = a; continue; }
+			// Tighter than the 2 BPM the estimate is measured against, and
+			// tighter than a tap can resolve. The point is that the input rate
+			// does not enter the answer at all.
+			check(std::fabs(a.bpm - reference.bpm) <= 0.05, "BPM depends on the input rate");
+			check(a.rhythm == reference.rhythm, "rhythm depends on the input rate");
+			check(a.meter == reference.meter, "metre depends on the input rate");
+		}
+
+		std::printf("resample: %d checks, %d failures\n", checks, failures);
+		return failures == 0 ? 0 : 1;
+	}
+
 	int run_model(const char * path)
 	{
 		std::ifstream in(path);
@@ -225,6 +391,7 @@ int main(int argc, char ** argv)
 {
 	const std::string mode = argc >= 2 ? argv[1] : "";
 	if (mode == "model" && argc >= 3) return run_model(argv[2]);
+	if (mode == "resample") return run_resample();
 	if (mode == "pipeline" && argc >= 4)
 		return run_pipeline(argv[2], static_cast<unsigned>(std::atoi(argv[3])),
 		                    argc >= 5 ? std::atoi(argv[4]) : 1);
@@ -238,6 +405,7 @@ int main(int argc, char ** argv)
 
 	std::fprintf(stderr,
 		"usage: bpmcore_test model <cases file>\n"
+		"       bpmcore_test resample\n"
 		"       bpmcore_test pipeline <raw f32 mono file> <sample rate>\n"
 		"       bpmcore_test bench <raw f32 mono file> <sample rate> [repeats]\n");
 	return 64;

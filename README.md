@@ -86,6 +86,10 @@ Advanced > Tools > BPM Analyser**:
       bpmcore_test pipeline track.f32 44100      # tempo and rhythm
       bpmcore_test bench    track.f32 44100 5    # timing
       bpmcore_test profile  track.f32 44100 5    # timing per stage
+      bpmcore_test resample                      # resampler, and rate independence
+
+  The `resample` case synthesises its own audio, so it runs in CI with no
+  collection to hand. It is also wired into CTest.
 
 `build\`, `external\` and `dist\` are all ignored by git.
 
@@ -105,6 +109,11 @@ while (decode(...)) c.add_interleaved(buffer, frames, channels);
 const bpmcore::analysis a = c.finish();
 // a.bpm, a.rhythm, a.confidence, a.beat_bpm, a.meter
 ```
+
+The analysis runs at 22.05kHz, the rate the rhythm model was fitted at. Any
+input rate that does not reproduce that geometry exactly is resampled on the way
+in, so a 48kHz file and a 44.1kHz transfer of the same side give the same answer
+and a 192kHz file costs no more to collect than a 44.1kHz one.
 
 `analyse()` takes mono PCM directly if the caller already has it. Both float and
 double samples are accepted. Pass a `bpmcore::listener` for progress and

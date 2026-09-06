@@ -2,10 +2,12 @@
 #define BPMCORE_INTERNAL_H
 
 // Shared internals of the analysis. Not part of the public interface, but split
-// across three translation units - envelope, tempo, rhythm - so each stays
-// readable on its own.
+// across translation units - resampling, envelope, tempo, rhythm - so each
+// stays readable on its own.
 
 #include "bpmcore.h"
+
+#include <cstdint>
 
 namespace bpmcore
 {
@@ -31,15 +33,63 @@ struct odf
 	bool empty() const { return frames <= 0; }
 };
 
-//! Analysis geometry, fixed in seconds rather than samples so that a track
-//! decoded at 44100Hz and the same track at 22050Hz give the same envelope -
-//! a host cannot be assumed to have a resampler.
+//! Analysis geometry, fixed in seconds rather than samples, so that the window
+//! and hop describe the same stretch of time whatever the input rate.
 extern const double odf_window_seconds;   //!< 1024 / 22050 = 46.4ms
 extern const double odf_hop_seconds;      //!< 256 / 22050 = 11.6ms
 extern const double odf_band_edges_hz[odf::band_count + 1];
 //! Magnitudes are compressed as log(1 + gamma * m) before differencing, so a
 //! quiet passage contributes onsets on the same scale as a loud one.
 extern const double odf_gamma;
+
+//! The rate the rhythm model was fitted at, and the rate the analysis runs at.
+extern const unsigned odf_model_rate;     //!< 22050
+
+//! True when `rate` reproduces the model's analysis with no resampling.
+//!
+//! Seconds-based geometry gets the window and hop right in time at any rate,
+//! but the window still has to be a power of two, so only a rate that is the
+//! model rate times a power of two gives both the model's 46.4ms window and its
+//! 21.53Hz per bin. 11.025, 44.1 and 88.2kHz do; 48kHz does not - it is handed
+//! a 2048-point window covering 42.7ms, which is a different analysis from the
+//! same track at 44.1kHz.
+bool rate_matches_model(unsigned rate);
+
+//! Rational polyphase resampler, used to bring any rate to `odf_model_rate`.
+//!
+//! Streaming, so the component can convert as the decoder produces audio and
+//! hold only the analysis-rate buffer; feeding everything in one call and then
+//! flushing gives the identical result, which is what keeps `analyse` and
+//! `collector` in step.
+class resampler
+{
+public:
+	//! `valid()` is false if the rates are unusable, in which case the caller
+	//! should analyse at the input rate rather than not at all.
+	resampler(unsigned from, unsigned to);
+
+	bool valid() const { return m_phases > 0; }
+	unsigned rate_out() const { return m_rate_out; }
+	//! Output samples `in` input samples produce once flushed.
+	std::size_t expected_output(std::size_t in) const;
+
+	//! Converts `count` samples, appending to `out`.
+	void process(const float * in, std::size_t count, std::vector<float> & out);
+	//! Emits the tail, so the output covers the input's duration exactly.
+	void flush(std::vector<float> & out);
+
+private:
+	int m_phases = 0;              //!< interpolation factor, L
+	int m_decim = 0;               //!< decimation factor, M
+	int m_taps = 0;                //!< coefficients per phase
+	std::int64_t m_delay = 0;      //!< group delay, in L * rate_in samples
+	unsigned m_rate_out = 0;
+	std::vector<float> m_coeff;    //!< m_phases rows of m_taps, time-reversed
+	std::vector<float> m_hist;     //!< input samples the next block reaches back over
+	std::vector<float> m_work;
+	std::int64_t m_consumed = 0;
+	std::int64_t m_produced = 0;
+};
 
 //! `threads` is 0 for automatic, 1 to stay on the calling thread. The result
 //! does not depend on it.

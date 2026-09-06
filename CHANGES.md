@@ -4,6 +4,26 @@ BPM Analyser for foobar2000
 Change Log
 ----------
 
+### Version 0.4.2
+
+* Files at 48kHz are analysed correctly. The onset envelope's geometry is fixed
+  in seconds, which gets the window and hop right in time at any rate, but the
+  window has to be a power of two as well - and at 48kHz that is 2048 points
+  covering 42.7ms where the geometry asks for 46.4, with the six band edges on
+  different bins. A 48kHz file and a 44.1kHz transfer of the same side were two
+  different analyses, and could disagree on the metre and the rhythm. Anything
+  whose rate is not 22.05kHz times a power of two is now resampled to 22.05kHz
+  first, which is the rate the model was fitted at; 32kHz, 96kHz and 192kHz were
+  wrong for the same reason and are fixed with it.
+* The resampler is a rational polyphase FIR with a Kaiser-windowed sinc, 80dB of
+  alias rejection and a passband flat to 0.01% out to 8kHz. It is cheap because
+  the envelope never reads above 8kHz, so it only has to be clean from 14kHz up
+  rather than from 11kHz up - six kilohertz of transition band instead of one.
+* Audio is downmixed and resampled as the decoder produces it rather than
+  afterwards, so what is held is bounded by the track's duration and not by its
+  sample rate. A long file at 192kHz used to need 690MB of buffer and now needs
+  79MB.
+
 ### Version 0.4.1
 
 * A tapped level is now only offered where the metre has one. Two beats is not

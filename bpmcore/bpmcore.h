@@ -19,10 +19,13 @@
 // implies. See docs/tango-analysis.md for how both were derived and measured.
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 namespace bpmcore
 {
+
+class resampler;
 
 enum rhythm_class
 {
@@ -79,12 +82,21 @@ analysis analyse(const float * mono, std::size_t count, unsigned sample_rate,
 //! compressed, and that is not knowable until the whole side has been seen, so
 //! the audio is buffered rather than streamed. Mono floats cost about 10MB for
 //! a three minute track, which is cheaper than decoding twice.
+//!
+//! Audio is downmixed and, where the input rate calls for it, resampled to the
+//! analysis rate on the way in, so what is held is bounded by the track's
+//! duration rather than by its sample rate - a 192kHz file costs no more to
+//! collect than a 44.1kHz one.
 class collector
 {
 public:
 	explicit collector(unsigned sample_rate);
+	~collector();
 
+	//! The rate audio is being handed in at, which is not necessarily the rate
+	//! the analysis will run at.
 	unsigned sample_rate() const { return m_rate; }
+	//! Mono samples held, at the analysis rate.
 	std::size_t size() const { return m_mono.size(); }
 	//! True once `max_seconds` has been reached; the host can stop decoding.
 	bool full() const { return m_mono.size() >= m_limit; }
@@ -98,9 +110,19 @@ public:
 
 	analysis finish(listener * l = nullptr, const options * opt = nullptr);
 
+	collector(const collector &) = delete;
+	collector & operator=(const collector &) = delete;
+
 private:
-	std::vector<float> m_mono;
+	//! Mono at the input rate, through the resampler if there is one.
+	void feed(const float * mono, std::size_t count);
+	std::size_t room(std::size_t frames) const;
+
+	std::vector<float> m_mono;      //!< at m_analysis_rate
+	std::vector<float> m_scratch;   //!< downmix at m_rate, before resampling
+	std::unique_ptr<resampler> m_resampler;   //!< null when the rate already fits
 	unsigned m_rate;
+	unsigned m_analysis_rate;
 	std::size_t m_limit;
 };
 

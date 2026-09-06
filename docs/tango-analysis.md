@@ -65,9 +65,21 @@ the beat being tracked was largely hiss. Keeping the bands apart lets the tempo
 stage normalise each one by its own variation before mixing, and gives the
 rhythm classifier something to read.
 
-The geometry is fixed in *seconds*, not samples, and the band edges in Hz, so a
-file at 44.1kHz and the same file at 22.05kHz produce the same envelope. A
-component cannot assume a resampler is available.
+The geometry is fixed in *seconds*, not samples, and the band edges in Hz. That
+gets the window and the hop right in time whatever the input rate, but the
+window still has to be a power of two, so only a rate that is 22.05kHz times a
+power of two — 11.025, 22.05, 44.1, 88.2 — lands on both the model's 46.4ms
+window and its 21.53Hz per bin. Anything else is resampled to 22.05kHz first
+(`resample.cpp`), which is the rate `odf.py` decodes the training set at and so
+the rate every figure here was measured at.
+
+48kHz is the case that made this necessary. Its window rounds to 2048 points
+covering 42.7ms where the geometry asks for 46.4, and the six band edges fall on
+different bins, so the same track at 48kHz and at 44.1kHz were two different
+analyses — on one recording resampled to both, the metre and the rhythm class
+could differ and the classifier's probability moved by up to 0.14. They now
+agree to the printed precision, and so do 32kHz, 96kHz and the rest; the
+`resample` test case in the harness is what holds that.
 
 ### 2. Tempo (`tempo.cpp`)
 
@@ -216,11 +228,17 @@ Performance
 Measured on a 169-second track, one core of a Ryzen 7 PRO 250, and after the
 optimisations below:
 
-| input rate | 1 thread | 2 threads | all cores |
-|------------|---------:|----------:|----------:|
-| 22050      |   0.137s |    0.089s |    0.053s |
-| 44100      |   0.201s |    0.128s |    0.073s |
-| 48000      |   0.195s |    0.125s |    0.073s |
+| input rate |  1 thread | 2 threads | all cores | resampled |
+|------------|----------:|----------:|----------:|:---------:|
+| 22050      |    0.146s |    0.093s |    0.055s |     no    |
+| 32000      |    0.195s |    0.141s |    0.103s |    yes    |
+| 44100      |    0.211s |    0.134s |    0.076s |     no    |
+| 48000      |    0.207s |    0.151s |    0.122s |    yes    |
+| 88200      |    0.381s |    0.238s |    0.132s |     no    |
+
+Resampling is roughly free on one thread — the smaller transform pays for the
+filter — but it is the one stage that is still serial, so it shows up as a
+regression once the transform is spread across cores.
 
 The spectral stage is 90–97% of the run time; nothing else is worth optimising
 until it is. What was done:
@@ -243,9 +261,20 @@ until it is. What was done:
   is **bit-identical whatever the thread count** — verified in the test harness.
   On two cores this is worth about 1.55×.
 
-Deliberately *not* done: decimating a 44.1kHz input to 22.05kHz before the
-transform. It would halve the transform, but a decimating FIR good enough to
-keep aliasing out of the 3200–8000Hz band costs about as much as it saves.
+Resampling used to be on the *not done* list, on the grounds that a decimating
+FIR good enough to keep aliasing out of the 3200–8000Hz band costs about as much
+as it saves. That was wrong about the filter. The envelope never reads above
+8kHz, so an alias landing between 8 and 11kHz lands in bins nothing looks at and
+the stopband only has to start where the first alias of the *passband* would
+fold back — 22050 − 8000 = 14050Hz. Six kilohertz of transition band instead of
+one is the difference between a filter that costs more than the transform it
+feeds and one that costs a fraction of it: 40 taps per output sample for 80dB of
+alias rejection, measured at 82–88dB, with the passband flat to 0.01% out to
+7900Hz.
+
+Still deliberately *not* done: analysing 44.1kHz through the resampler. It would
+halve the transform, and the filter is now cheap enough to be worth it, but it
+would move every answer on the rates that carry the measured accuracy.
 
 
 Reproducing the model

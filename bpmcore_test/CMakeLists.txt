@@ -16,4 +16,9 @@ endif()
 add_test(NAME rhythm_model
          COMMAND bpmcore_test model "${CMAKE_CURRENT_SOURCE_DIR}/reference_cases.tsv")
 
+# Checks the resampler, and that a synthesised track gives the same tempo,
+# rhythm and metre at every input rate. Synthesises its own audio, so it needs
+# nothing on disk.
+add_test(NAME resample COMMAND bpmcore_test resample)
+
 set_target_properties(bpmcore_test PROPERTIES FOLDER "Tests")

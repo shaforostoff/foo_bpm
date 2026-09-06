@@ -7,6 +7,7 @@
 add_library(bpmcore STATIC
     analyse.cpp
     odf.cpp
+    resample.cpp
     rhythm.cpp
     tempo.cpp
 
