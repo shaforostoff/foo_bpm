@@ -9,20 +9,37 @@
 
 using std::string;
 
-bpm_result_dialog::bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc::list_t<file_info_impl> &p_infos, const std::vector<double> &p_bpm_results):
+bpm_result_dialog::bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc::list_t<file_info_impl> &p_infos,
+                                     const std::vector<double> &p_bpm_results, const std::vector<pfc::string8> &p_rhythms):
 	m_tracks(p_tracks),
 	m_infos(p_infos),
-	m_bpm_results(p_bpm_results)
+	m_bpm_results(p_bpm_results),
+	m_rhythms(p_rhythms)
 {
+}
+
+namespace
+{
+	//! The rhythm tag, or an empty string when writing it is switched off.
+	pfc::string8 rhythm_tag_or_empty()
+	{
+		pfc::string8 tag;
+		if (!bpm_config_write_rhythm_tag.get()) return tag;
+		bpm_config_rhythm_tag.get(tag);
+		return tag;
+	}
 }
 
 LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 {
 	if (bpm_config_auto_write_tag)
 	{
+		const pfc::string8 rhythm_tag = rhythm_tag_or_empty();
 		metadb_io_v2::get()->update_info_async(
 			m_tracks,
-			fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
+			fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results,
+			                                        rhythm_tag.is_empty() ? nullptr : rhythm_tag.get_ptr(),
+			                                        m_rhythms),
 			core_api::get_main_window(),
 			metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 			NULL);
@@ -37,6 +54,7 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 		// TODO: Remember status of scan result (ie. success, ambiguous, double, half)
 	//	 listview_helper::insert_column(result_list, 1, "Status", 60);
 		listview_helper::insert_column(result_list, 1, "BPM", 50);
+		listview_helper::insert_column(result_list, 2, "Rhythm", 70);
 		// TODO: Allow selection of an alternate BPM
 	//	 listview_helper::insert_column(result_list, 3, "BPM (Alt)", 50);
 
@@ -60,6 +78,8 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 			format_bpm bpm_value(m_bpm_results[index]);
 
 			listview_helper::set_item_text(result_list, row, 1, bpm_value);
+			if (row < m_rhythms.size())
+				listview_helper::set_item_text(result_list, row, 2, m_rhythms[row]);
 		}
 
 		pfc::string_formatter bpm_tag_label;
@@ -74,9 +94,12 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 
 LRESULT bpm_result_dialog::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl)
 {
+	const pfc::string8 rhythm_tag = rhythm_tag_or_empty();
 	metadb_io_v2::get()->update_info_async(
 		m_tracks,
-		fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results),
+		fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results,
+		                                        rhythm_tag.is_empty() ? nullptr : rhythm_tag.get_ptr(),
+		                                        m_rhythms),
 		core_api::get_main_window(),
 		metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 		NULL);

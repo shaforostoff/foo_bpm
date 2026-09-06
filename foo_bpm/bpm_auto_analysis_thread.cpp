@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "bpm_auto_analysis_thread.h"
-#include "bpm_auto_analysis.h"
+#include "bpm_analysis.h"
 #include "preferences.h"
 #include "bpm_result_dialog.h"
 
@@ -86,6 +86,7 @@ void bpm_auto_analysis_thread::start()
 void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_callback & p_abort)
 {
 	m_bpm_results.resize(0);
+	m_rhythms.resize(0);
 
 	p_status.set_progress(0, m_tracks.get_size());
 
@@ -103,9 +104,22 @@ void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_cal
 		{
 			p_status.set_item_path(m_tracks[index]->get_location().get_path());
 
-			bpm_auto_analysis bpm(m_tracks[index]);
-			double bpm_result = bpm.run_safe(p_status, p_abort);
-			m_bpm_results.push_back(bpm_result);
+			bpmcore::analysis result;
+			try
+			{
+				result = bpm_analyse(m_tracks[index], p_status, p_abort);
+			}
+			catch (const exception_aborted &)
+			{
+				throw;
+			}
+			catch (const std::exception & exc)
+			{
+				FB2K_console_formatter() << "foo_bpm: error analysing "
+				                         << m_tracks[index]->get_path() << ": " << exc;
+			}
+			m_bpm_results.push_back(result.bpm);
+			m_rhythms.push_back(result.ok ? bpmcore::rhythm_name(result.rhythm) : "");
 
 			p_status.set_progress(index+1, m_tracks.get_size());
 		}
@@ -119,7 +133,7 @@ void bpm_auto_analysis_thread::on_done(ctx_t p_wnd, bool p_was_aborted)
 
 	if (!p_was_aborted && core_api::assert_main_thread())
 	{
-		bpm_result_dialog* m_result_dialog = new bpm_result_dialog(m_tracks, m_infos, m_bpm_results);
+		bpm_result_dialog* m_result_dialog = new bpm_result_dialog(m_tracks, m_infos, m_bpm_results, m_rhythms);
 
 		m_result_dialog->Create(core_api::get_main_window(), NULL);
 		if (m_result_dialog->IsWindow())

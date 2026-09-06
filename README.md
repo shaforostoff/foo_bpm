@@ -5,6 +5,18 @@ Originally written by Michael Balzer.
 
 Bug fixes and refactoring by Holger Stenger.
 
+Detects the tempo of a track and which of Tango, Vals or Milonga it is - or
+none of the three - from the audio alone, without reading the genre tag.
+
+The two answers are linked. The tempo a dancer taps is not a property of the
+audio by itself: a tango is tapped on the beat, a vals once per 3/4 bar, a
+milonga once per 2/4 bar. So the rhythm is settled first and the tempo reported
+on the level that rhythm implies. Measured against 3,664 hand-tapped tracks the
+estimate lands within 2 BPM of the tap 88.5% of the time, which is about as
+close as the same person tapping the same track twice; rhythm classification is
+94% accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method
+and the full numbers.
+
 Building
 --------
 
@@ -29,6 +41,28 @@ To work on it in Visual Studio, configure once and open the generated solution:
     cmake --build build\x64 --config Release
     ctest --test-dir build\x64 -C Release
 
+### Layout
+
+* `bpmcore/` is the analysis, and has no host in it - no foobar2000, no pfc, no
+  ATL, no `windows.h`. Only the standard library and KISS FFT, so the same
+  sources build for a command line tool, a macOS host or an ARM target. Start at
+  `bpmcore/bpmcore.h`.
+* `foo_bpm/` is the foobar2000 component: decoding, tag writing, dialogs and
+  preferences. It hands `bpmcore` mono PCM and gets a tempo and a rhythm back.
+* `bpmcore_test/` verifies the analysis without foobar2000 running, and can
+  benchmark and profile it.
+* `scripts/analysis/` is the Python reference implementation and the training
+  pipeline that generates `bpmcore/rhythm_model.h`. See its README.
+
+### Settings
+
+The preferences page is unchanged. Three entries live under **Preferences >
+Advanced > Tools > BPM Analyser**:
+
+* *Use the legacy BPM engine* - the original 2009 algorithm. The preferences
+  page's STFT and candidate-selection controls only apply to it.
+* *Write the detected rhythm to a tag* and *Rhythm tag name* - default `RHYTHM`.
+
 ### How the build hangs together
 
 * `scripts\get_sdk.ps1` downloads the SDK and WTL, checks both against a pinned
@@ -45,8 +79,36 @@ To work on it in Visual Studio, configure once and open the generated solution:
   of `kiss_fft_cpx`.
 * `kiss_fft_test` verifies the half-complex packing that `bpm_fft_impl_kissfft`
   depends on, and is wired into CTest.
+* `bpmcore_test` checks that the decision trees compiled into
+  `bpmcore/rhythm_model.h` still reproduce the classifier they were exported
+  from, and is wired into CTest too. It also runs the analysis over raw PCM:
+
+      bpmcore_test pipeline track.f32 44100      # tempo and rhythm
+      bpmcore_test bench    track.f32 44100 5    # timing
+      bpmcore_test profile  track.f32 44100 5    # timing per stage
 
 `build\`, `external\` and `dist\` are all ignored by git.
+
+Using the analysis elsewhere
+----------------------------
+
+`bpmcore` is a static library with one header and no host dependencies:
+
+```cpp
+#include <bpmcore/bpmcore.h>
+
+bpmcore::collector c(sample_rate);
+while (decode(...)) c.add_interleaved(buffer, frames, channels);
+
+const bpmcore::analysis a = c.finish();
+// a.bpm, a.rhythm, a.confidence, a.beat_bpm, a.meter
+```
+
+`analyse()` takes mono PCM directly if the caller already has it. Both float and
+double samples are accepted. Pass a `bpmcore::listener` for progress and
+cancellation, and a `bpmcore::options` to control threading - the spectral stage
+is over 90% of the run time and is spread across cores by default, with an
+answer that does not depend on the thread count.
 
 References
 ----------

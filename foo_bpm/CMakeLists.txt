@@ -7,6 +7,7 @@
 # tells the two apart.
 
 add_library(foo_bpm MODULE
+    bpm_analysis.cpp
     bpm_auto_analysis.cpp
     bpm_auto_analysis_thread.cpp
     bpm_contextmenu_item.cpp
@@ -22,6 +23,7 @@ add_library(foo_bpm MODULE
     preferences.cpp
     foo_bpm.rc
 
+    bpm_analysis.h
     bpm_auto_analysis.h
     bpm_auto_analysis_thread.h
     bpm_contextmenu_item.h
@@ -45,7 +47,12 @@ set_target_properties(foo_bpm PROPERTIES
     PREFIX ""
     SUFFIX ".dll")
 
-target_link_libraries(foo_bpm PRIVATE fb2k::sdk kiss_fft)
+target_link_libraries(foo_bpm PRIVATE fb2k::sdk kiss_fft bpmcore)
+
+# windows.h defines min and max as macros, which breaks every std::min/std::max
+# in the analysis code. Neither the SDK nor WTL relies on the macros, so they
+# are simply turned off for this target.
+target_compile_definitions(foo_bpm PRIVATE NOMINMAX)
 
 # stdafx.h is the precompiled header: it pulls in the SDK, ATL and WTL, which
 # dwarf this component's own sources.

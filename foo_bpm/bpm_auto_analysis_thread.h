@@ -18,6 +18,7 @@ class bpm_auto_analysis_thread : public threaded_process_callback
 		pfc::list_t<metadb_handle_ptr> m_tracks;
 		pfc::list_t<file_info_impl> m_infos;
 		std::vector<double> m_bpm_results;
+		std::vector<pfc::string8> m_rhythms;
 };
 
 #endif // __BPM_AUTO_ANALYSIS_THREAD_H__

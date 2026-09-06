@@ -24,7 +24,8 @@ public:
 		MSG_WM_CLOSE(OnClose);
 	END_MSG_MAP()
 
-	bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc::list_t<file_info_impl> &p_infos, const std::vector<double> &p_bpm_results);
+	bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc::list_t<file_info_impl> &p_infos,
+	                  const std::vector<double> &p_bpm_results, const std::vector<pfc::string8> &p_rhythms);
 		
 private:
 	LRESULT OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
@@ -48,6 +49,7 @@ private:
 	metadb_handle_list m_tracks;
 	pfc::list_t<file_info_impl> m_infos;
 	std::vector<double> m_bpm_results;
+	std::vector<pfc::string8> m_rhythms;
 };
 
 #endif // __DPM_RESULT_DIALOG_H__

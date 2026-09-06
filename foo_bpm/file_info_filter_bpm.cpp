@@ -4,9 +4,13 @@
 
 #include "format_bpm.h"
 
-file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, const char * p_bpm_tag, const std::vector<double> & p_bpm_results)
-	: m_bpm_tag(p_bpm_tag)
+file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, const char * p_bpm_tag,
+                                           const std::vector<double> & p_bpm_results,
+                                           const char * p_rhythm_tag,
+                                           const std::vector<pfc::string8> & p_rhythms)
+	: m_bpm_tag(p_bpm_tag), m_rhythm_tag(p_rhythm_tag != nullptr ? p_rhythm_tag : "")
 {
+	const bool have_rhythms = p_rhythms.size() == p_bpm_results.size() && !m_rhythm_tag.is_empty();
 	pfc::dynamic_assert(p_tracks.get_count() == p_bpm_results.size());
 	pfc::array_t<t_size> order;
 	order.set_size(p_tracks.get_count());
@@ -14,11 +18,15 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
 	p_tracks.sort_get_permutation_t(pfc::compare_t<metadb_handle_ptr, metadb_handle_ptr>, order.get_ptr());
 	m_tracks.set_count(order.get_size());
 	m_bpm_results.resize(order.get_size());
+	if (have_rhythms) m_rhythms.resize(order.get_size());
 
+	// The tracks are sorted so apply_filter can bsearch them; every parallel
+	// array has to follow the same permutation.
 	for(t_size n = 0; n < order.get_size(); n++)
 	{
 		m_tracks[n] = p_tracks[order[n]];
 		m_bpm_results[n] = p_bpm_results[order[n]];
+		if (have_rhythms) m_rhythms[n] = p_rhythms[order[n]];
 	}
 }
 
@@ -36,6 +44,10 @@ bool file_info_filter_bpm::apply_filter(metadb_handle_ptr p_track, t_filestats p
 	{
 		format_bpm bpm_value(m_bpm_results[index]);
 		p_info.meta_set(m_bpm_tag, bpm_value);
+		if (index < m_rhythms.size() && !m_rhythm_tag.is_empty() && !m_rhythms[index].is_empty())
+		{
+			p_info.meta_set(m_rhythm_tag, m_rhythms[index]);
+		}
 		return true;
 	}
 	else

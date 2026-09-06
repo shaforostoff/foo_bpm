@@ -7,3 +7,7 @@
 /.vs
 /CMakeUserPresets.json
 *.user
+
+# The analysis pipeline's scratch lives under /build, which is already ignored.
+__pycache__/
+*.pyc
