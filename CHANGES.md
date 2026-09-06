@@ -4,6 +4,21 @@ BPM Analyser for foobar2000
 Change Log
 ----------
 
+### Version 0.4.1
+
+* A tapped level is now only offered where the metre has one. Two beats is not
+  a position in a 3/4 bar, and offering it sent slow valses - a Peruvian vals at
+  56 to the bar - to the two-beat rate instead; vals goes from 90.5% to 94.1%
+  within 2 BPM of the tap. For "other", which states no metre of its own, the
+  level set follows the metre the grid search found, so a duple piece is no
+  longer read at two thirds of its beat: *Chan Chan* was coming out at 112
+  rather than 84, and *Guantanamera* at 83 rather than 125.
+* The milonga tempo prior now spans 42 to 65 to the bar rather than 44 to 63.
+  The collection holds nothing above 61, so this changes no measured result; it
+  makes room for a fast milonga it does not happen to contain.
+* Overall: within 2 BPM of the tap on 89.0% of 3,664 hand-tapped tracks, right
+  metrical level on 96.6%.
+
 ### Version 0.4.0
 
 * New tempo engine, aimed at Argentine tango. It reports the tempo on the

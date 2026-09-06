@@ -38,18 +38,20 @@ namespace
 	{
 		{ 125.5, 0.075, 1.6 },   // tango:   tapped on the beat
 		{  68.5, 0.090, 1.6 },   // vals:    tapped once per 3/4 bar
-		{  52.5, 0.110, 1.6 },   // milonga: tapped once per 2/4 bar
+		{  52.5, 0.130, 1.6 },   // milonga: tapped once per 2/4 bar
 		{ 110.0, 0.450, 6.0 },   // other:   whatever pulse is most salient
 	};
 
 	// Levels the tapped rate may sit on, relative to the beat period. Offering a
 	// duple rhythm a division by three is what used to send slow milongas to
-	// beat/3 instead of beat/4, and a 3/4 vals cannot have its bar at twice the
-	// beat, so the sets are kept apart.
+	// beat/3 instead of beat/4, so the sets are kept apart.
+	//
+	// Two beats is not a metrical level of a 3/4 bar, and leaving it in the
+	// triple set was enough to take a slow vals - a Peruvian one at 56 to the
+	// bar, below anything the Argentine prior expects - and report the
+	// two-beat rate instead. It is not offered.
 	const double levels_duple[]  = { 1.0/8, 1.0/4, 1.0/2, 1.0, 2.0, 4.0 };
-	const double levels_triple[] = { 1.0/6, 1.0/3, 1.0/2, 2.0/3, 1.0, 1.5, 2.0, 3.0 };
-	const double levels_any[]    = { 1.0/8, 1.0/6, 1.0/4, 1.0/3, 1.0/2, 2.0/3, 3.0/4,
-	                                 1.0, 4.0/3, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0 };
+	const double levels_triple[] = { 1.0/6, 1.0/3, 1.0/2, 2.0/3, 1.0, 1.5, 3.0 };
 
 	//! Taps run marginally ahead of the measured pulse across the whole
 	//! collection. A calibration to that habit, not a correction to the measurement.
@@ -361,24 +363,26 @@ double refine_period(const std::vector<double> & r, double lag0)
 	return best_lag;
 }
 
-double tapped_bpm(const std::vector<double> & r, double beat_lag, int rhythm, double frame_rate)
+double tapped_bpm(const std::vector<double> & r, double beat_lag, int rhythm,
+                  int meter, double frame_rate)
 {
 	if (beat_lag <= 0 || r.empty()) return 0.0;
 
 	const double lag = refine_period(r, beat_lag);
 
-	const double * levels = levels_any;
-	std::size_t level_count = sizeof(levels_any) / sizeof(levels_any[0]);
-	if (rhythm == rhythm_tango || rhythm == rhythm_milonga)
-	{
-		levels = levels_duple;
-		level_count = sizeof(levels_duple) / sizeof(levels_duple[0]);
-	}
-	else if (rhythm == rhythm_vals)
-	{
-		levels = levels_triple;
-		level_count = sizeof(levels_triple) / sizeof(levels_triple[0]);
-	}
+	// The three tango rhythms state their own metre, whatever the grid search
+	// made of it. "Other" is everything from chacarera to disco and states
+	// nothing, so there the detected metre decides - which keeps a duple piece
+	// off the two-thirds level. Reading a son at two thirds of its beat was
+	// what put Chan Chan at 112 and Guantanamera at 83.
+	const bool triple = rhythm == rhythm_vals ||
+	                    (rhythm != rhythm_tango && rhythm != rhythm_milonga &&
+	                     (meter == 3 || meter == 6));
+
+	const double * levels = triple ? levels_triple : levels_duple;
+	const std::size_t level_count = triple
+		? sizeof(levels_triple) / sizeof(levels_triple[0])
+		: sizeof(levels_duple) / sizeof(levels_duple[0]);
 
 	const tempo_prior & prior =
 		priors[(rhythm >= 0 && rhythm < rhythm_class_count) ? rhythm : rhythm_other];

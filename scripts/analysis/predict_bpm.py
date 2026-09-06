@@ -13,22 +13,28 @@ import tempo as TP, features as F
 PRIOR = {
     'tango':   (125.5, 0.075, 1.6),
     'vals':    ( 68.5, 0.090, 1.6),
-    'milonga': ( 52.5, 0.110, 1.6),
+    'milonga': ( 52.5, 0.130, 1.6),
     'other':   (110.0, 0.450, 6.0),
 }
 # Levels the tapped rate can sit on, relative to the detected beat period.
-# The set is class-specific: a 3/4 vals cannot have its bar at twice the beat,
-# and offering a duple rhythm a /3 level is what made slow milongas land on
-# beat/3 instead of beat/4.
+# Offering a duple rhythm a /3 level is what made slow milongas land on beat/3
+# instead of beat/4, so the sets are kept apart. Two beats is not a metrical
+# level of a 3/4 bar and is not offered: leaving it in was enough to take a
+# Peruvian vals at 56 to the bar and report the two-beat rate instead.
 LEVELS_DUPLE  = [1/8, 1/4, 1/2, 1.0, 2.0, 4.0]
-LEVELS_TRIPLE = [1/6, 1/3, 1/2, 2/3, 1.0, 3/2, 2.0, 3.0]
-LEVELS_ANY    = sorted(set(LEVELS_DUPLE + LEVELS_TRIPLE + [3/4, 4/3, 6.0, 8.0]))
-LEVELS = {
-    'tango':   LEVELS_DUPLE,
-    'milonga': LEVELS_DUPLE,
-    'vals':    LEVELS_TRIPLE,
-    'other':   LEVELS_ANY,
-}
+LEVELS_TRIPLE = [1/6, 1/3, 1/2, 2/3, 1.0, 3/2, 3.0]
+
+
+def levels_for(cls, meter):
+    """The three tango rhythms state their own metre, whatever the grid search
+    made of it. 'other' - chacarera through disco - states nothing, so there the
+    detected metre decides, which keeps a duple piece off the two-thirds level.
+    """
+    if cls == 'vals':
+        return LEVELS_TRIPLE
+    if cls in ('tango', 'milonga'):
+        return LEVELS_DUPLE
+    return LEVELS_TRIPLE if meter in (3, 6) else LEVELS_DUPLE
 
 # Taps run marginally ahead of the measured pulse across the whole collection;
 # this is an empirical calibration, not a physical correction.
@@ -72,7 +78,7 @@ def predict(odf, cls, r=None, grid=None):
     lag = refine_period(r, lag)
     mu, sig, sup_w = PRIOR.get(cls, PRIOR['other'])
     best, out, dbg = -1e18, 0.0, {}
-    for k in LEVELS.get(cls, LEVELS_ANY):
+    for k in levels_for(cls, int(grid.get('meter', 4))):
         L = lag * k
         bpm = TP.lag_to_bpm(L)
         if not (25.0 <= bpm <= 320.0):
