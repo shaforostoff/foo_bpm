@@ -24,19 +24,37 @@ const double odf_band_edges_hz[odf::band_count + 1] =
 
 namespace
 {
-	//! Power of two nearest to `n` in log terms.
+	//! Nearest even integer to `n` with no prime factor above 5.
 	//!
-	//! Rounding up instead would give a 48kHz file a 4096 point window - 85ms
-	//! where the geometry asks for 46 - which is both twice the work and a
-	//! different analysis from the same track at 44.1kHz.
-	int nearest_pow2(int n)
+	//! The window has to last 46.4ms whatever the rate, or the analysis is not
+	//! the one the model was fitted at. A rate that is the model rate times a
+	//! power of two hits that exactly and lands on 1024, 2048, 4096 - and those
+	//! are the only rates `analyse` lets through, because anything else is
+	//! resampled first. This matters on the one path that is left: when the
+	//! ratio is unusable the resampler stands aside and the track is analysed at
+	//! its own rate, and there a power of two can be a long way out. 48kHz would
+	//! take 2048 points for 42.7ms; 32kHz would take 2048 for 64ms, a window
+	//! nearly 40% too long.
+	//!
+	//! Restricting to 2, 3 and 5 keeps the transform fast: those are the radices
+	//! kiss_fft has butterflies for, and anything else drops to a generic stage
+	//! quadratic in the factor. Powers of two are 5-smooth, so every rate that
+	//! does reach here by the ordinary route gets exactly what it got before.
+	int nearest_smooth(int n)
 	{
-		if (n < 2) return 1;
-		int lo = 1;
-		while (lo * 2 <= n) lo *= 2;
-		const int hi = lo * 2;
-		// Compare in log space: pick whichever ratio is closer to one.
-		return (static_cast<double>(n) * n >= static_cast<double>(lo) * hi) ? hi : lo;
+		if (n < 2) return 2;
+		const auto smooth = [](int v)
+		{
+			if (v % 2 != 0) return false;          // kiss_fftr needs an even size
+			for (int f : { 2, 3, 5 }) while (v % f == 0) v /= f;
+			return v == 1;
+		};
+		for (int d = 0; d <= n; d++)
+		{
+			if (n - d >= 2 && smooth(n - d)) return n - d;
+			if (smooth(n + d)) return n + d;
+		}
+		return n + (n & 1);
 	}
 
 	//! Symmetric Hann window, matching numpy's hanning(), which is what the
@@ -156,7 +174,7 @@ bool compute_odf(const float * mono, std::size_t count, unsigned sample_rate,
 	if (mono == nullptr || count == 0 || sample_rate == 0) return false;
 
 	const int hop = std::max(1, static_cast<int>(std::lround(odf_hop_seconds * sample_rate)));
-	const int nfft = nearest_pow2(std::max(16,
+	const int nfft = nearest_smooth(std::max(16,
 		static_cast<int>(std::lround(odf_window_seconds * sample_rate))));
 	const int nbin = nfft / 2 + 1;
 

@@ -36,6 +36,11 @@ Change Log
   read and how long to analyse, as separate numbers. Reading is usually the
   larger of the two by a wide margin - a three-minute side is around 0.05s of
   analysis - so this is the first thing to look at if a scan feels slow.
+* The transform size is now the nearest even number with no prime factor above 5
+  rather than the nearest power of two. Every rate that reaches the analysis is
+  resampled to one where those are the same value, so nothing measured changes;
+  it keeps the window near 46.4ms on the one path left over, where a ratio the
+  resampler cannot approximate means the track is analysed at its own rate.
 
 ### Version 0.4.1
 

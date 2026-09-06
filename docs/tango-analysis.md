@@ -66,12 +66,19 @@ stage normalise each one by its own variation before mixing, and gives the
 rhythm classifier something to read.
 
 The geometry is fixed in *seconds*, not samples, and the band edges in Hz. That
-gets the window and the hop right in time whatever the input rate, but the
-window still has to be a power of two, so only a rate that is 22.05kHz times a
-power of two — 11.025, 22.05, 44.1, 88.2 — lands on both the model's 46.4ms
-window and its 21.53Hz per bin. Anything else is resampled to 22.05kHz first
-(`resample.cpp`), which is the rate `odf.py` decodes the training set at and so
-the rate every figure here was measured at.
+gets the window and the hop right in time whatever the input rate, but only a
+rate that is 22.05kHz times a power of two — 11.025, 22.05, 44.1, 88.2 —
+reproduces the model's 46.4ms window *and* its 21.53Hz per bin exactly. Anything
+else is resampled to 22.05kHz first (`resample.cpp`), which is the rate `odf.py`
+decodes the training set at and so the rate every figure here was measured at.
+
+The transform size is the nearest even number with no prime factor above 5,
+which for those four rates is the power of two they already landed on. It only
+does anything on the path where the resampler stands aside — a ratio it cannot
+approximate — and the track is analysed at its own rate after all: 46.9ms at
+48kHz rather than the 42.7ms a power of two would give, or 46.9 at 32kHz rather
+than 64. Sizes built from 2, 3 and 5 are the ones kiss_fft has butterflies for,
+so nothing pays for the flexibility.
 
 48kHz is the case that made this necessary. Its window rounds to 2048 points
 covering 42.7ms where the geometry asks for 46.4, and the six band edges fall on
@@ -260,10 +267,11 @@ until it is. What was done:
 * **Only the used bins leave the transform.** The bands stop at 8kHz, so on a
   44.1kHz file 370 bins of the 1025 produced are turned into magnitudes. The
   logarithm is the single most expensive operation in the loop.
-* **The window is rounded to the *nearest* power of two, not up.** Rounding up
-  gave a 48kHz file a 4096-point window — 85ms where the geometry asks for 46 —
-  which was both twice the work and a different analysis from the same track at
-  44.1kHz. This alone halved the 48kHz case.
+* **The window is the nearest even 5-smooth size.** Every rate the resampler
+  lets through is a power of two anyway, so this costs those nothing; it keeps
+  the window near 46.4ms on the fallback path, where a power of two can be 40%
+  out. Rounding *up* to a power of two, which is where this started, gave a
+  48kHz file an 85ms window — twice the work and a different analysis again.
 * **Two tight loops, not one fused one.** Computing the whole span of logarithms
   and differencing afterwards measured a third faster than interleaving them:
   the transcendental loop pipelines cleanly only when nothing else is storing
