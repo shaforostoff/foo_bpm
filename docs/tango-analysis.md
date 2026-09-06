@@ -65,9 +65,19 @@ the beat being tracked was largely hiss. Keeping the bands apart lets the tempo
 stage normalise each one by its own variation before mixing, and gives the
 rhythm classifier something to read.
 
-The geometry is fixed in *seconds*, not samples, and the band edges in Hz, so a
-file at 44.1kHz and the same file at 22.05kHz produce the same envelope. A
-component cannot assume a resampler is available.
+The geometry is fixed in *seconds*, not samples, and the band edges in Hz,
+because a component cannot assume a resampler is available. The window is the
+nearest even 5-smooth number of samples to 46.4ms, so it lands within 1% of that
+at any rate - 2048 at 44.1kHz, 2250 at 48kHz, 1500 at 32kHz. Restricting to
+factors of 2, 3 and 5 is what keeps the transform fast; rounding to a power of
+two instead, as this once did, gives 48kHz a 42.7ms window and 32kHz a 64ms one.
+
+That is close, not identical. A file at 22.05kHz and the same file at 44.1kHz do
+produce the same envelope, because the sizes are exactly proportional; a 48kHz
+file does not, and on a sample of 40 native 48kHz tracks the rhythm it is given
+differs from the 22.05kHz reading about one time in twelve. Making that exact
+needs a resampler in front of the analysis, which is not there yet. 8% of the
+reference collection is 48kHz.
 
 ### 2. Tempo (`tempo.cpp`)
 
@@ -106,12 +116,20 @@ harmonics are not.
 * novelty curve kurtosis and skew: a sharply articulated marcato and a smooth
   legato line look very different at the same tempo.
 
-Gradient boosted trees over those features (150 iterations, 15 leaves, four
-classes). Logistic regression on the same features reaches only 85% — the
+Gradient boosted trees over those features (150 iterations, 15 leaves, five
+classes: tango, vals, milonga, swing, other). Logistic regression on the same features reaches only 85% — the
 interactions are real — so the trees are exported verbatim into
 `bpmcore/rhythm_model.h` and walked directly. Thresholds and leaf values are
 stored as `double`: rounding a threshold to `float` is enough to send a feature
 down the other side of a split.
+
+**Swing** is the fifth class, and the loosest. It gathers the foxtrots the tango
+orchestras recorded alongside their tangos and the swing-era dance band music
+among the cortinas - 167 tracks, against 8,523 tangos. Foxtrot and swing are put
+together deliberately: the foxtrot is the *dance*, swing is the *idiom* that
+filled it, and 1930s labels printed "Fox Trot" on records we would now file under
+swing. What separates them is phrasing and improvisation, which these features do
+not look at; what they share is the metre, which is all these features see.
 
 ### 4. The tapped level (`tempo.cpp`, `tapped_bpm`)
 
@@ -162,36 +180,49 @@ heavily, and many sides exist as a transfer, a declicked copy and a retuned
 copy):
 
 ```
-n=12118   accuracy=94.13%   balanced=88.37%
+n=12118   accuracy=93.22%   balanced=78.46%
 
-actual        tango     vals  milonga    other   recall
-tango          8386       23       18       96    98.4%
-vals             21      927        6       52    92.1%
-milonga          64       12      624       53    82.9%
-other           199       97       70     1470    80.1%
-precision     96.7%    87.5%    86.9%    88.0%
+actual        tango     vals  milonga    swing    other   recall
+tango          8374       27       22        2       98    98.3%
+vals             22      935        8        4       37    92.9%
+milonga          65       18      623        5       42    82.7%
+swing             9       17        6       68       67    40.7%
+other           202       84       65       22     1296    77.7%
+precision     96.6%    86.5%    86.0%    67.3%    84.2%
 ```
 
-Restricted to the tango-era collections alone — where every track is a shellac
-transfer, so recording quality cannot be doing the work — accuracy is 94.61%,
-with tango/vals/milonga recall at 98.5 / 92.3 / 83.0%.
+Restricted to the tango-era collections alone - where every track is a shellac
+transfer, so recording quality cannot be doing the work - accuracy is 93.94%.
+
+Swing is the weak one, and the trade is worth stating plainly. Adding it costs
+about nine tenths of a point of overall accuracy, all of it in the swing row and
+in "other" losing tracks to it; the three tango rhythms are untouched, and vals
+and milonga each move up a little. Two thirds of what it calls swing is swing,
+but it finds only two fifths of what is there - and almost everything it misses
+goes to "other" rather than to a tango rhythm, which is the failure to prefer.
+The cause is the class size: 167 examples against 8,523 tangos. A few hundred
+labelled foxtrots would make this a strong class.
 
 BPM against the 3,664 hand-tapped tracks, using the **predicted** rhythm:
 
 | rhythm  |   n  | exact | ≤1 BPM | ≤2 BPM | ≤3 BPM | right level |
 |---------|-----:|------:|-------:|-------:|-------:|------------:|
-| tango   | 2732 | 34.6% |  74.6% |  88.4% |  93.8% |       98.3% |
-| vals    |  455 | 43.5% |  86.4% |  94.1% |  94.5% |       94.9% |
-| milonga |  425 | 41.4% |  81.2% |  88.2% |  89.2% |       89.2% |
+| tango   | 2732 | 34.6% |  74.6% |  88.4% |  93.7% |       98.3% |
+| vals    |  455 | 44.6% |  87.9% |  95.6% |  96.0% |       96.5% |
+| milonga |  425 | 41.4% |  80.7% |  88.2% |  88.9% |       88.9% |
 | other   |   52 | 34.6% |  71.2% |  80.8% |  82.7% |       84.6% |
-| **all** | 3664 | 36.5% |  76.8% |  89.0% |  93.2% |       96.6% |
+| **all** | 3664 | 36.6% |  76.9% |  89.1% |  93.3% |       96.8% |
+
+Swing has no row because it has no hand taps: not one foxtrot in the collection
+carries a tapped BPM, so there is no tapping convention to fit and its prior is
+a placeholder that leaves the choice to the autocorrelation.
 
 Set against the tap-to-tap repeatability above (68% within 1, 84% within 2, 93%
 within 3), the estimator agrees with a tap about as closely as the same person
 tapping twice.
 
 The rhythm classifier is what buys most of this. Skipping it and treating every
-track as a tango gives 66.9% within 2 BPM instead of 89.0%.
+track as a tango gives 66.9% within 2 BPM instead of 89.1%.
 
 ### Where it still misses
 
@@ -200,8 +231,12 @@ track as a tango gives 66.9% within 2 BPM instead of 89.0%.
   than the bar, a dozen tangos tapped at half rate. Nothing in the audio
   distinguishes them; the same recording tapped on another day would land
   differently.
-* **Milonga recall, 83%.** Milonga is the smallest class and shades into
-  candombe and *milonga tangueada*, which are genuinely intermediate.
+* **Milonga recall, 83%.** Milonga is the smallest of the tango rhythms and
+  shades into candombe and *milonga tangueada*, which are genuinely intermediate.
+* **Swing recall, 41%.** Too few examples, and it competes with everything else
+  in 4/4. It rarely loses a foxtrot to a tango rhythm, which is what matters.
+* **48kHz input.** See the note under the onset envelope: the geometry is within
+  1% at any rate, but exact only where the sizes are proportional.
 * **"Other" tempo.** With 52 tapped examples spanning Glenn Miller to Daft Punk
   there is no convention to learn, and what is left is an octave choice with
   nothing to settle it: *Bitter Sweet Symphony* and *La Tanga* have beats within
@@ -226,8 +261,8 @@ optimisations below:
 | input rate | 1 thread | 2 threads | all cores |
 |------------|---------:|----------:|----------:|
 | 22050      |   0.137s |    0.089s |    0.053s |
-| 44100      |   0.201s |    0.128s |    0.073s |
-| 48000      |   0.195s |    0.125s |    0.073s |
+| 44100      |   0.207s |    0.128s |    0.073s |
+| 48000      |   0.241s |    0.150s |    0.086s |
 
 The spectral stage is 90–97% of the run time; nothing else is worth optimising
 until it is. What was done:
@@ -235,10 +270,12 @@ until it is. What was done:
 * **Only the used bins leave the transform.** The bands stop at 8kHz, so on a
   44.1kHz file 370 bins of the 1025 produced are turned into magnitudes. The
   logarithm is the single most expensive operation in the loop.
-* **The window is rounded to the *nearest* power of two, not up.** Rounding up
-  gave a 48kHz file a 4096-point window — 85ms where the geometry asks for 46 —
-  which was both twice the work and a different analysis from the same track at
-  44.1kHz. This alone halved the 48kHz case.
+* **The window is the nearest even 5-smooth size, not the nearest power of two.**
+  It has to last 46.4ms at every rate or the analysis is not the one the model
+  was trained on, and powers of two cannot do that: 48kHz gets 42.7ms and 32kHz
+  64ms. Sizes whose factors are 2, 3 and 5 are the ones kiss_fft has butterflies
+  for, so the constraint costs little - 44.1kHz still lands exactly on 2048, and
+  48kHz pays about 15% for its 2250.
 * **Two tight loops, not one fused one.** Computing the whole span of logarithms
   and differencing afterwards measured a third faster than interleaving them:
   the transcendental loop pipelines cleanly only when nothing else is storing

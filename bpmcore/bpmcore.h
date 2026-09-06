@@ -29,11 +29,12 @@ enum rhythm_class
 	rhythm_tango = 0,
 	rhythm_vals,
 	rhythm_milonga,
+	rhythm_swing,   //!< foxtrot and swing - 4/4 dance band, not a tango rhythm
 	rhythm_other,
 	rhythm_class_count
 };
 
-//! "Tango", "Vals", "Milonga" or "Other". Never null.
+//! "Tango", "Vals", "Milonga", "Swing" or "Other". Never null.
 const char * rhythm_name(int cls);
 
 struct analysis

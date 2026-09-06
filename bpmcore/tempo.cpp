@@ -33,12 +33,18 @@ namespace
 	//! prior. Tango, vals and milonga have priors tight enough to settle the
 	//! level on their own; "other" spans bossa to disco and has no useful tempo
 	//! prior, so there the audio is trusted and the prior only breaks ties.
+	//!
+	//! Swing is in the second camp for a duller reason: the collection holds
+	//! exactly one hand-tapped foxtrot, so there is nothing to fit. Its centre
+	//! is where a foxtrot is usually counted and its width is deliberately
+	//! large, which leaves the choice to the autocorrelation.
 	struct tempo_prior { double mu; double sigma; double support; };
 	const tempo_prior priors[rhythm_class_count] =
 	{
 		{ 125.5, 0.075, 1.6 },   // tango:   tapped on the beat
 		{  68.5, 0.090, 1.6 },   // vals:    tapped once per 3/4 bar
 		{  52.5, 0.101, 1.6 },   // milonga: tapped once per 2/4 bar, 44 to 62
+		{ 130.0, 0.400, 6.0 },   // swing:   a placeholder - see below
 		{ 110.0, 0.450, 6.0 },   // other:   whatever pulse is most salient
 	};
 
@@ -135,6 +141,7 @@ const char * rhythm_name(int cls)
 		case rhythm_tango:   return "Tango";
 		case rhythm_vals:    return "Vals";
 		case rhythm_milonga: return "Milonga";
+		case rhythm_swing:   return "Swing";
 		default:             return "Other";
 	}
 }
@@ -375,9 +382,10 @@ double tapped_bpm(const std::vector<double> & r, double beat_lag, int rhythm,
 	// nothing, so there the detected metre decides - which keeps a duple piece
 	// off the two-thirds level. Reading a son at two thirds of its beat was
 	// what put Chan Chan at 112 and Guantanamera at 83.
+	const bool stated_duple = rhythm == rhythm_tango || rhythm == rhythm_milonga ||
+	                          rhythm == rhythm_swing;
 	const bool triple = rhythm == rhythm_vals ||
-	                    (rhythm != rhythm_tango && rhythm != rhythm_milonga &&
-	                     (meter == 3 || meter == 6));
+	                    (!stated_duple && (meter == 3 || meter == 6));
 
 	const double * levels = triple ? levels_triple : levels_duple;
 	const std::size_t level_count = triple

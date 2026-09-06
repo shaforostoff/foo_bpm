@@ -5,16 +5,16 @@ Originally written by Michael Balzer.
 
 Bug fixes and refactoring by Holger Stenger.
 
-Detects the tempo of a track and which of Tango, Vals or Milonga it is - or
-none of the three - from the audio alone, without reading the genre tag.
+Detects the tempo of a track and which of Tango, Vals, Milonga or Swing it is -
+or none of those - from the audio alone, without reading the genre tag.
 
 The two answers are linked. The tempo a dancer taps is not a property of the
 audio by itself: a tango is tapped on the beat, a vals once per 3/4 bar, a
 milonga once per 2/4 bar. So the rhythm is settled first and the tempo reported
 on the level that rhythm implies. Measured against 3,664 hand-tapped tracks the
-estimate lands within 2 BPM of the tap 89.0% of the time, which is about as
+estimate lands within 2 BPM of the tap 89.1% of the time, which is about as
 close as the same person tapping the same track twice; rhythm classification is
-94% accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method
+93% accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method
 and the full numbers.
 
 Building

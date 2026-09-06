@@ -4,6 +4,26 @@ BPM Analyser for foobar2000
 Change Log
 ----------
 
+### Version 0.5.0
+
+* New rhythm class, **Swing**: the foxtrots the tango orchestras recorded and the
+  swing-era dance band music that turns up as cortinas. Foxtrot and swing are one
+  class on purpose - the foxtrot is the dance, swing the idiom that filled it,
+  and what separates them is phrasing rather than metre. It is the weakest class
+  by a distance: it finds 41% of them and is right 67% of the time it fires,
+  because there are 167 examples against 8,523 tangos. Tango, vals and milonga
+  are unaffected; overall accuracy goes from 94.1% to 93.2%, entirely in the new
+  class and in "other".
+* Swing has no tempo prior worth the name - the collection holds no hand-tapped
+  foxtrot at all - so its BPM comes from the audio the way "other" does.
+* The analysis window is now the nearest even size with no prime factor above 5
+  rather than the nearest power of two, so it lasts 46.4ms at every sample rate
+  instead of only at rates related to 22.05kHz by a power of two. A 48kHz file
+  was getting 42.7ms and a 32kHz file 64ms. 48kHz analysis is about 15% slower
+  as a result; 44.1kHz is unchanged.
+* `rhythm_class` gained a value, so anything compiled against `bpmcore.h` needs
+  rebuilding.
+
 ### Version 0.4.1
 
 * A tapped level is now only offered where the metre has one. Two beats is not

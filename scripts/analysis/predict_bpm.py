@@ -14,6 +14,9 @@ PRIOR = {
     'tango':   (125.5, 0.075, 1.6),
     'vals':    ( 68.5, 0.090, 1.6),
     'milonga': ( 52.5, 0.101, 1.6),
+    # one hand-tapped foxtrot in the whole collection, so this is a placeholder:
+    # wide, and weighted so the autocorrelation decides.
+    'swing':   (130.0, 0.400, 6.0),
     'other':   (110.0, 0.450, 6.0),
 }
 # Levels the tapped rate can sit on, relative to the detected beat period.
@@ -32,7 +35,7 @@ def levels_for(cls, meter):
     """
     if cls == 'vals':
         return LEVELS_TRIPLE
-    if cls in ('tango', 'milonga'):
+    if cls in ('tango', 'milonga', 'swing'):
         return LEVELS_DUPLE
     return LEVELS_TRIPLE if meter in (3, 6) else LEVELS_DUPLE
 

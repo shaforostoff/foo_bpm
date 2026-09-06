@@ -12,7 +12,7 @@ import config
 import tango_labels as T, features as F
 from sklearn.ensemble import HistGradientBoostingClassifier
 
-CLS = ['tango', 'vals', 'milonga', 'other']
+CLS = T.CLASSES
 OUT = r'C:\Dev\foo_bpm\bpmcore\rhythm_model.h'
 
 

@@ -2,7 +2,7 @@
 """Shared ground-truth labelling for the tango collections."""
 import json, os, re
 
-CLASSES = ['tango', 'vals', 'milonga', 'other']
+CLASSES = ['tango', 'vals', 'milonga', 'swing', 'other']
 
 
 def parse_bpm(rec):
@@ -40,6 +40,11 @@ _RULES = [
                  'vals serenata', 'valsecito', 'vals', 'waltz', 'walzer']),
     ('tango',   ['tango cancion', 'tango sinfonico', 'tango canyengue', 'tango negro',
                  'tango campero', 'tango electronico', 'tango nuevo', 'tango']),
+    # 4/4 dance-band music of the same era: the foxtrots the tango orchestras
+    # recorded, and the swing that turns up among the cortinas. Last, so that
+    # anything naming a tango rhythm is claimed above.
+    ('swing',   ['fox trot', 'fox-trot', 'foxtrot', 'big band', 'boogie woogie',
+                 'dixieland', 'charleston', 'ragtime', 'shimmy', 'swing', 'jazz']),
 ]
 
 _ACC = str.maketrans('áàâäãéèêëíìîïóòôöõúùûüñç', 'aaaaaeeeeiiiiooooouuuunc')
