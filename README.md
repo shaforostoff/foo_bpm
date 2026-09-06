@@ -92,7 +92,9 @@ Advanced > Tools > BPM Analyser**:
 Using the analysis elsewhere
 ----------------------------
 
-`bpmcore` is a static library with one header and no host dependencies:
+`bpmcore` is a static library with one public header. Its only dependency is
+KISS FFT, built with `kiss_fft_scalar=double`; there is no foobar2000, Windows
+or ATL in it.
 
 ```cpp
 #include <bpmcore/bpmcore.h>
