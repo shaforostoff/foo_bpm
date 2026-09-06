@@ -13,7 +13,7 @@ import tempo as TP, features as F
 PRIOR = {
     'tango':   (125.5, 0.075, 1.6),
     'vals':    ( 68.5, 0.090, 1.6),
-    'milonga': ( 52.5, 0.130, 1.6),
+    'milonga': ( 52.5, 0.101, 1.6),
     'other':   (110.0, 0.450, 6.0),
 }
 # Levels the tapped rate can sit on, relative to the detected beat period.

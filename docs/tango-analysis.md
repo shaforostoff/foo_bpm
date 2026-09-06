@@ -125,8 +125,13 @@ apart. **The value itself always comes from the autocorrelation peak**, so a
 prior cannot pull a tempo towards its mean. That separation is deliberate: the
 priors are tight (tango is 125.5 with a log sigma of 0.075) and would otherwise
 flatten every tango to the same number. Milonga is the widest of the three, at
-52.5 with a log sigma of 0.130, which puts its 5th to 95th percentile at 42 to
-65 to the bar.
+52.5 with a log sigma of 0.101, which puts its 5th to 95th percentile at 44 to
+62 to the bar.
+
+How wide that one is turns out not to matter: anything from 0.07 to 0.13 gives
+the same answer on every track in the collection, because the levels a milonga
+chooses between are an octave apart and four sigma still does not reach half way.
+The number is set to say what a milonga's bar rate is, not to tune a result.
 
 **The levels on offer have to be levels of the metre.** Two beats is not a
 metrical position in a 3/4 bar, and while it was offered a slow vals could be

@@ -38,7 +38,7 @@ namespace
 	{
 		{ 125.5, 0.075, 1.6 },   // tango:   tapped on the beat
 		{  68.5, 0.090, 1.6 },   // vals:    tapped once per 3/4 bar
-		{  52.5, 0.130, 1.6 },   // milonga: tapped once per 2/4 bar
+		{  52.5, 0.101, 1.6 },   // milonga: tapped once per 2/4 bar, 44 to 62
 		{ 110.0, 0.450, 6.0 },   // other:   whatever pulse is most salient
 	};
 

@@ -13,9 +13,10 @@ Change Log
   level set follows the metre the grid search found, so a duple piece is no
   longer read at two thirds of its beat: *Chan Chan* was coming out at 112
   rather than 84, and *Guantanamera* at 83 rather than 125.
-* The milonga tempo prior now spans 42 to 65 to the bar rather than 44 to 63.
-  The collection holds nothing above 61, so this changes no measured result; it
-  makes room for a fast milonga it does not happen to contain.
+* The milonga tempo prior is stated as 44 to 62 to the bar. It is a level
+  chooser and the levels it chooses between are an octave apart, so its width
+  changes no measured result; the constant is there to say what a milonga's bar
+  rate is.
 * Overall: within 2 BPM of the tap on 89.0% of 3,664 hand-tapped tracks, right
   metrical level on 96.6%.
 
