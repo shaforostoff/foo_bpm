@@ -4,6 +4,34 @@ BPM Analyser for foobar2000
 Change Log
 ----------
 
+### Version 0.4.0
+
+* New tempo engine, aimed at Argentine tango. It reports the tempo on the
+  metrical level a dancer taps - the beat for a tango, the bar for a vals or a
+  milonga - which needs the rhythm, so the rhythm is detected first. Against
+  3,664 hand-tapped tracks it lands within 2 BPM of the tap 88.5% of the time
+  and picks the right metrical level for 96.2%; the previous behaviour of
+  treating everything alike managed 66.9% within 2 BPM.
+* New rhythm classifier: Tango, Vals, Milonga or other, from the audio alone,
+  with no reference to the genre tag. 94.1% accurate over 12,118 tracks. The
+  result is shown in the results dialog and written to a `RHYTHM` tag.
+* The analysis is now a standalone library, `bpmcore`, with no foobar2000,
+  Windows or ATL dependency, so it can be reused elsewhere and on other
+  platforms. The component is a shell around it.
+* Whole tracks are analysed rather than a few short excerpts, and local tempo is
+  reduced with a median across overlapping windows, so a passage that drifts,
+  a rubato phrase or a beatless introduction no longer moves the answer.
+* Onset detection is now per frequency band. The old broadband flux was weighted
+  towards the top of the spectrum, which on a shellac transfer is surface noise.
+* The spectral stage is spread across cores, with a result that is identical
+  whatever the thread count, and only the frequency bins the analysis actually
+  uses leave the transform. A 48kHz file is about twice as fast as before for a
+  second reason: its analysis window was being rounded up to 4096 points, which
+  also made it a different analysis from the same track at 44.1kHz.
+* The 2009 algorithm is still available: *Preferences > Advanced > Tools > BPM
+  Analyser > Use the legacy BPM engine*. The preferences page's STFT and
+  candidate-selection controls only apply to it.
+
 ### Version 0.3.0
 
 * 64 bit support: the component now loads in 64 bit foobar2000 2.x. One

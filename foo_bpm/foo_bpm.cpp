@@ -90,7 +90,7 @@
 
 DECLARE_COMPONENT_VERSION(
 	"BPM Analyser",
-	"0.3.0",
+	"0.4.0",
 	"A component for automatically analysing the BPM of audio files.\n"
 	"\n"
 	"Built against the foobar2000 SDK 2025-03-07; runs on 32 and 64 bit foobar2000.\n"

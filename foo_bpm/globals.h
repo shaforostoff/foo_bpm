@@ -2,6 +2,7 @@
 #define __GLOBALS_H__
 
 #include <SDK/foobar2000.h>
+#include <SDK/advconfig_impl.h>
 #include "guid.h"
 
 // Config variables
@@ -25,5 +26,13 @@ extern cfg_bool bpm_config_output_debug;
 // Manual
 extern cfg_int bpm_config_taps_to_average;
 extern cfg_int bpm_config_seconds_to_reset_average;
+
+// Advanced preferences. These live under Preferences > Advanced > Tools > BPM
+// Analyser rather than on the component's own page: the page's STFT and
+// candidate-selection controls only apply to the legacy engine, and the switch
+// that turns the legacy engine back on does not belong next to them.
+extern advconfig_checkbox_factory bpm_config_use_legacy_engine;
+extern advconfig_checkbox_factory bpm_config_write_rhythm_tag;
+extern advconfig_string_factory bpm_config_rhythm_tag;
 
 #endif

@@ -18,7 +18,7 @@ if(POLICY CMP0091)
 endif()
 
 project(foo_bpm
-        VERSION 0.3.0
+        VERSION 0.4.0
         DESCRIPTION "BPM Analyser for foobar2000"
         LANGUAGES C CXX)   # kiss_fft is C
 
@@ -112,10 +112,12 @@ endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/fb2k_sdk.cmake")
 
 add_subdirectory(kiss_fft)
+add_subdirectory(bpmcore)
 add_subdirectory(foo_bpm)
 
-option(FOO_BPM_BUILD_TESTS "Build the FFT verification harness" ON)
+option(FOO_BPM_BUILD_TESTS "Build the verification harnesses" ON)
 if(FOO_BPM_BUILD_TESTS)
     enable_testing()
     add_subdirectory(kiss_fft_test)
+    add_subdirectory(bpmcore_test)
 endif()

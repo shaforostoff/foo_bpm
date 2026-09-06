@@ -21,3 +21,19 @@ cfg_bool bpm_config_output_debug(guid_bpm_config_output_debug, false);
 // Manual
 cfg_int bpm_config_taps_to_average(guid_bpm_config_taps_to_average, 30);
 cfg_int bpm_config_seconds_to_reset_average(guid_bpm_config_seconds_to_reset_average, 5);
+
+// Advanced preferences
+static advconfig_branch_factory bpm_config_branch(
+	"BPM Analyser", guid_bpm_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
+
+advconfig_checkbox_factory bpm_config_use_legacy_engine(
+	"Use the legacy BPM engine (pre-0.3.1)", guid_bpm_config_use_legacy_engine,
+	guid_bpm_advconfig_branch, 0, false);
+
+advconfig_checkbox_factory bpm_config_write_rhythm_tag(
+	"Write the detected rhythm to a tag", guid_bpm_config_write_rhythm_tag,
+	guid_bpm_advconfig_branch, 1, true);
+
+advconfig_string_factory bpm_config_rhythm_tag(
+	"Rhythm tag name", guid_bpm_config_rhythm_tag,
+	guid_bpm_advconfig_branch, 2, "RHYTHM");
