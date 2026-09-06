@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "parallel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -45,6 +46,33 @@ namespace
 	//! Enough for 80dB at 192kHz, which is the highest rate worth resampling
 	//! from. Nothing realistic reaches the clamp.
 	const int max_taps_per_phase = 160;
+
+	//! Output blocks per thread. Enough that a core held up elsewhere does not
+	//! leave the rest waiting on it, few enough that the hand-off is noise.
+	const int blocks_per_thread = 8;
+	const int min_outputs_per_thread = 8192;
+
+	//! `taps` products, in four independent sums.
+	//!
+	//! MSVC will not reassociate float addition, so a single running total stays
+	//! scalar. Four accumulators let it use the whole vector unit, and are still
+	//! deterministic - which matters, because the answer must not depend on how
+	//! the work was divided.
+	float dot(const float * coeff, const float * x, int taps)
+	{
+		float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+		int k = 0;
+		for (; k + 4 <= taps; k += 4)
+		{
+			a0 += coeff[k]     * x[k];
+			a1 += coeff[k + 1] * x[k + 1];
+			a2 += coeff[k + 2] * x[k + 2];
+			a3 += coeff[k + 3] * x[k + 3];
+		}
+		float acc = (a0 + a1) + (a2 + a3);
+		for (; k < taps; k++) acc += coeff[k] * x[k];
+		return acc;
+	}
 
 	//! Modified Bessel function of the first kind, order zero.
 	//!
@@ -198,27 +226,10 @@ void resampler::process(const float * in, std::size_t count, std::vector<float> 
 	for (std::int64_t n = m_produced; n < end; n++)
 	{
 		const std::int64_t at = n * m_decim + m_delay;
-		const float * coeff = m_coeff.data() +
-			static_cast<std::size_t>(at % m_phases) * taps;
 		// The oldest input sample this output reads. Guaranteed inside m_work:
 		// `end` is exactly the point at which it stops being.
-		const float * x = m_work.data() + (at / m_phases - (taps - 1) - origin);
-
-		// Four accumulators rather than one. MSVC will not reassociate float
-		// addition, so a single running sum stays scalar; four independent ones
-		// let it use the whole vector unit and are still deterministic.
-		float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
-		int k = 0;
-		for (; k + 4 <= taps; k += 4)
-		{
-			a0 += coeff[k]     * x[k];
-			a1 += coeff[k + 1] * x[k + 1];
-			a2 += coeff[k + 2] * x[k + 2];
-			a3 += coeff[k + 3] * x[k + 3];
-		}
-		float acc = (a0 + a1) + (a2 + a3);
-		for (; k < taps; k++) acc += coeff[k] * x[k];
-		*dst++ = acc;
+		*dst++ = dot(m_coeff.data() + static_cast<std::size_t>(at % m_phases) * taps,
+		             m_work.data() + (at / m_phases - (taps - 1) - origin), taps);
 	}
 	m_produced = end;
 
@@ -248,6 +259,79 @@ void resampler::flush(std::vector<float> & out)
 		out.resize(out.size() - static_cast<std::size_t>(m_produced - want));
 		m_produced = want;
 	}
+}
+
+float resampler::tap_edges(std::int64_t at, const float * in, std::size_t count) const
+{
+	const std::int64_t first = at / m_phases - (m_taps - 1);
+
+	// Gathered into a zero-padded window and then put through the same dot
+	// product as the interior, rather than summed here with the missing samples
+	// skipped. Skipping them would sum in a different order, and the two paths
+	// have to agree to the last bit - the streaming path reads those same zeros
+	// out of its history buffer and its `flush` feed.
+	std::vector<float> window(static_cast<std::size_t>(m_taps), 0.0f);
+	for (int k = 0; k < m_taps; k++)
+	{
+		const std::int64_t i = first + k;
+		if (i >= 0 && i < static_cast<std::int64_t>(count))
+			window[static_cast<std::size_t>(k)] = in[static_cast<std::size_t>(i)];
+	}
+	return dot(m_coeff.data() + static_cast<std::size_t>(at % m_phases) * m_taps,
+	           window.data(), m_taps);
+}
+
+void resampler::convert_all(const float * in, std::size_t count,
+                            std::vector<float> & out, int threads)
+{
+	if (!valid() || in == nullptr || count == 0) return;
+
+	const std::int64_t total = static_cast<std::int64_t>(expected_output(count));
+	if (total <= 0) return;
+	const std::size_t base = out.size();
+	out.resize(base + static_cast<std::size_t>(total));
+	float * dst = out.data() + base;
+
+	// Where the filter sits wholly inside the input and no output has to look
+	// past either end. Output n reads input samples at/L - taps + 1 through
+	// at/L, with at = n*M + delay, so the first needs at >= (taps-1)*L and the
+	// last needs at <= count*L - 1.
+	const std::int64_t span = static_cast<std::int64_t>(m_taps - 1) * m_phases;
+	const std::int64_t lo = span > m_delay
+		? std::min(total, (span - m_delay + m_decim - 1) / m_decim) : 0;
+	const std::int64_t last = static_cast<std::int64_t>(count) * m_phases - 1 - m_delay;
+	const std::int64_t hi = last >= 0
+		? std::max(lo, std::min(total, last / m_decim + 1)) : lo;
+
+	for (std::int64_t n = 0; n < lo; n++)
+		dst[n] = tap_edges(n * m_decim + m_delay, in, count);
+	for (std::int64_t n = hi; n < total; n++)
+		dst[n] = tap_edges(n * m_decim + m_delay, in, count);
+
+	const int taps = m_taps;
+	const int n_threads = resolve_threads(threads, static_cast<int>(hi - lo),
+	                                      min_outputs_per_thread);
+	const std::int64_t per_block =
+		std::max<std::int64_t>(1, (hi - lo + n_threads * blocks_per_thread - 1) /
+		                          (n_threads * blocks_per_thread));
+	const int blocks = static_cast<int>((hi - lo + per_block - 1) / per_block);
+
+	parallel_blocks(blocks, n_threads, [&](int b)
+	{
+		const std::int64_t begin = lo + static_cast<std::int64_t>(b) * per_block;
+		const std::int64_t stop = std::min(hi, begin + per_block);
+		for (std::int64_t n = begin; n < stop; n++)
+		{
+			const std::int64_t at = n * m_decim + m_delay;
+			dst[n] = dot(m_coeff.data() + static_cast<std::size_t>(at % m_phases) * taps,
+			             in + (at / m_phases - (taps - 1)), taps);
+		}
+	});
+
+	// A one-shot conversion is the whole track, so the streaming state is left
+	// consistent with having been fed and flushed.
+	m_consumed = static_cast<std::int64_t>(count);
+	m_produced = total;
 }
 
 }   // namespace bpmcore

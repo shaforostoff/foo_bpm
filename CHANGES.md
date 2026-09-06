@@ -23,6 +23,19 @@ Change Log
   afterwards, so what is held is bounded by the track's duration and not by its
   sample rate. A long file at 192kHz used to need 690MB of buffer and now needs
   79MB.
+* Faster, with no change to any answer. The autocorrelation and the resampler
+  are now spread across cores as the envelope already was, and all three give
+  the same result at any thread count. For a 169-second track on all cores:
+  22.05kHz 0.055s to 0.039s, 32kHz 0.103s to 0.059s, 48kHz 0.122s to 0.057s.
+  48kHz is now quicker than 44.1kHz despite the extra stage, because it is
+  analysed at 22.05kHz where the transform is a quarter of the size.
+* Tracks are opened for a sequential read, so a decoder need not build a
+  seektable that will never be used, and a file carrying looping metadata is no
+  longer decoded round and round until the length cap stops it.
+* With *output debug information* on, each track now logs how long it took to
+  read and how long to analyse, as separate numbers. Reading is usually the
+  larger of the two by a wide margin - a three-minute side is around 0.05s of
+  analysis - so this is the first thing to look at if a scan feels slow.
 
 ### Version 0.4.1
 

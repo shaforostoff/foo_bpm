@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "parallel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,6 +15,9 @@ namespace
 	const double acf_hop_seconds    =  3.0;
 
 	const double novelty_local_mean_seconds = 0.6;
+
+	//! Windows below this are not worth a thread hand-off.
+	const int min_windows_per_thread = 4;
 
 	// Candidate beat rates. The beat is not what a dancer taps for every rhythm,
 	// but it is the level the audio states most clearly, so the search is
@@ -204,7 +208,7 @@ void make_novelty(std::vector<float> & x, double frame_rate)
 }
 
 void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
-                   int max_lag, double frame_rate)
+                   int max_lag, double frame_rate, int threads)
 {
 	acf.clear();
 	const int n = static_cast<int>(y.size());
@@ -222,22 +226,25 @@ void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
 	if (starts.empty()) starts.push_back(0);
 
 	// One autocorrelation per window, kept so they can be reduced lag by lag.
-	std::vector<std::vector<double> > per_window;
-	per_window.reserve(starts.size());
-
-	std::vector<double> seg(W);
-	for (std::size_t w = 0; w < starts.size(); w++)
+	// The windows do not interact, so they are computed across cores; a slot is
+	// reserved per window rather than appended to, which keeps the result
+	// independent of the thread count.
+	std::vector<std::vector<double> > slots(starts.size());
+	const int n_threads = resolve_threads(threads, static_cast<int>(starts.size()),
+	                                      min_windows_per_thread);
+	parallel_blocks(static_cast<int>(starts.size()), n_threads, [&](int w)
 	{
 		const int s = starts[w];
 		const int len = std::min(W, n - s);
-		if (len <= L + 8) continue;
+		if (len <= L + 8) return;
 
+		std::vector<double> seg(len);
 		double sum = 0;
 		for (int i = 0; i < len; i++) sum += y[s + i];
 		const double mean = sum / len;
 		double var = 0;
 		for (int i = 0; i < len; i++) { seg[i] = y[s + i] - mean; var += seg[i] * seg[i]; }
-		if (var / len < 1e-18) continue;
+		if (var / len < 1e-18) return;
 
 		std::vector<double> r(L, 0.0);
 		// Direct evaluation. At 86 frames a second this is a few hundred
@@ -258,8 +265,15 @@ void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
 			const double inv = 1.0 / r[0];
 			for (double & v : r) v *= inv;
 		}
-		per_window.push_back(std::move(r));
-	}
+		slots[w] = std::move(r);
+	});
+
+	// A window with no periodicity in it - a beatless introduction, a run of
+	// digital silence - leaves its slot empty and drops out here.
+	std::vector<std::vector<double> > per_window;
+	per_window.reserve(slots.size());
+	for (std::size_t w = 0; w < slots.size(); w++)
+		if (!slots[w].empty()) per_window.push_back(std::move(slots[w]));
 
 	if (per_window.empty()) return;
 

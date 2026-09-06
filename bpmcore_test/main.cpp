@@ -105,7 +105,7 @@ namespace
 	}
 
 	//! Stage-by-stage timings, to show where the run time actually goes.
-	int run_profile(const char * path, unsigned sample_rate, int repeats)
+	int run_profile(const char * path, unsigned sample_rate, int repeats, int threads)
 	{
 		std::vector<float> mono;
 		if (!read_pcm(path, mono))
@@ -115,7 +115,9 @@ namespace
 		}
 		const double audio = static_cast<double>(mono.size()) / sample_rate;
 
-		double t_odf = 1e18, t_nov = 1e18, t_acf = 1e18, t_grid = 1e18, t_feat = 1e18, t_cls = 1e18;
+		// Resampling is a stage now, and one that only runs for some rates.
+		double t_res = 1e18, t_odf = 1e18, t_nov = 1e18, t_acf = 1e18;
+		double t_grid = 1e18, t_feat = 1e18, t_cls = 1e18;
 		auto now = [] { return std::chrono::steady_clock::now(); };
 		auto secs = [](std::chrono::steady_clock::time_point a,
 		               std::chrono::steady_clock::time_point b)
@@ -123,9 +125,26 @@ namespace
 
 		for (int i = 0; i < repeats; i++)
 		{
-			bpmcore::odf o;
+			auto tr0 = now();
+			std::vector<float> converted;
+			const float * pcm = mono.data();
+			std::size_t count = mono.size();
+			unsigned rate = sample_rate;
+			if (!bpmcore::rate_matches_model(sample_rate))
+			{
+				bpmcore::resampler rs(sample_rate, bpmcore::odf_model_rate);
+				if (rs.valid())
+				{
+					rs.convert_all(mono.data(), mono.size(), converted, threads);
+					pcm = converted.data();
+					count = converted.size();
+					rate = rs.rate_out();
+				}
+			}
 			auto t0 = now();
-			if (!bpmcore::compute_odf(mono.data(), mono.size(), sample_rate, o, nullptr)) return 3;
+
+			bpmcore::odf o;
+			if (!bpmcore::compute_odf(pcm, count, rate, o, nullptr, threads)) return 3;
 			auto t1 = now();
 
 			std::vector<float> novelty;
@@ -135,7 +154,7 @@ namespace
 
 			std::vector<double> acf;
 			bpmcore::autocorrelate(novelty, acf,
-				static_cast<int>(std::lround(5.0 * o.frame_rate)), o.frame_rate);
+				static_cast<int>(std::lround(5.0 * o.frame_rate)), o.frame_rate, threads);
 			auto t3 = now();
 
 			const bpmcore::grid g = bpmcore::find_grid(acf, o.frame_rate);
@@ -150,6 +169,7 @@ namespace
 			bpmcore::tapped_bpm(acf, g.beat_lag, cls, g.meter, o.frame_rate);
 			auto t6 = now();
 
+			t_res = std::min(t_res, secs(tr0, t0));
 			t_odf = std::min(t_odf, secs(t0, t1));
 			t_nov = std::min(t_nov, secs(t1, t2));
 			t_acf = std::min(t_acf, secs(t2, t3));
@@ -157,11 +177,13 @@ namespace
 			t_feat = std::min(t_feat, secs(t4, t5));
 			t_cls = std::min(t_cls, secs(t5, t6));
 		}
-		const double sum = t_odf + t_nov + t_acf + t_grid + t_feat + t_cls;
-		std::printf("audio=%.1fs total=%.4fs (%.0fx realtime)\n", audio, sum, audio / sum);
-		const char * names[] = { "envelope", "novelty", "autocorr", "grid", "features", "classify" };
-		const double times[] = { t_odf, t_nov, t_acf, t_grid, t_feat, t_cls };
-		for (int i = 0; i < 6; i++)
+		const double sum = t_res + t_odf + t_nov + t_acf + t_grid + t_feat + t_cls;
+		std::printf("audio=%.1fs threads=%d total=%.4fs (%.0fx realtime)\n",
+		            audio, threads, sum, audio / sum);
+		const char * names[] = { "resample", "envelope", "novelty", "autocorr",
+		                         "grid", "features", "classify" };
+		const double times[] = { t_res, t_odf, t_nov, t_acf, t_grid, t_feat, t_cls };
+		for (int i = 0; i < 7; i++)
 			std::printf("  %-9s %7.4fs  %5.1f%%\n", names[i], times[i], 100.0 * times[i] / sum);
 		return 0;
 	}
@@ -265,6 +287,18 @@ namespace
 		for (std::size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++)
 			check(convert(48000, 22050, beats, blocks[i]) == whole,
 			      "streaming and one-shot conversion differ");
+
+		// And the parallel one-shot path has to agree with both, whatever the
+		// thread count: every output is an independent dot product, so dividing
+		// the range must not change a bit.
+		const int thread_counts[] = { 1, 2, 0 };
+		for (std::size_t i = 0; i < sizeof(thread_counts) / sizeof(thread_counts[0]); i++)
+		{
+			bpmcore::resampler one(48000, 22050);
+			std::vector<float> once;
+			one.convert_all(beats.data(), beats.size(), once, thread_counts[i]);
+			check(once == whole, "the parallel conversion differs from the streaming one");
+		}
 
 		// The output has to cover the input's duration, to the sample.
 		const bpmcore::resampler geometry(48000, 22050);
@@ -397,7 +431,8 @@ int main(int argc, char ** argv)
 		                    argc >= 5 ? std::atoi(argv[4]) : 1);
 	if (mode == "profile" && argc >= 4)
 		return run_profile(argv[2], static_cast<unsigned>(std::atoi(argv[3])),
-		                   argc >= 5 ? std::max(1, std::atoi(argv[4])) : 3);
+		                   argc >= 5 ? std::max(1, std::atoi(argv[4])) : 3,
+		                   argc >= 6 ? std::atoi(argv[5]) : 1);
 	if (mode == "bench" && argc >= 4)
 		return run_bench(argv[2], static_cast<unsigned>(std::atoi(argv[3])),
 		                 argc >= 5 ? std::max(1, std::atoi(argv[4])) : 3,

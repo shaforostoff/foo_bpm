@@ -46,7 +46,9 @@ To work on it in Visual Studio, configure once and open the generated solution:
 * `bpmcore/` is the analysis, and has no host in it - no foobar2000, no pfc, no
   ATL, no `windows.h`. Only the standard library and KISS FFT, so the same
   sources build for a command line tool, a macOS host or an ARM target. Start at
-  `bpmcore/bpmcore.h`.
+  `bpmcore/bpmcore.h`. The three stages that are worth spreading across cores -
+  resampling, the envelope and the autocorrelation - all divide their work so
+  that the answer does not depend on the thread count.
 * `foo_bpm/` is the foobar2000 component: decoding, tag writing, dialogs and
   preferences. It hands `bpmcore` mono PCM and gets a tempo and a rhythm back.
 * `bpmcore_test/` verifies the analysis without foobar2000 running, and can

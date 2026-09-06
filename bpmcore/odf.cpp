@@ -1,11 +1,11 @@
 #include "internal.h"
+#include "parallel.h"
 
 #include <kiss_fft/kiss_fftr.h>
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
-#include <thread>
 #include <vector>
 
 namespace bpmcore
@@ -145,23 +145,8 @@ namespace
 		std::vector<double> m_prev, m_cur;
 	};
 
-	int resolve_threads(int requested, int total_frames)
-	{
-		if (requested == 1) return 1;
-		int n = requested;
-		if (n <= 0)
-		{
-			n = static_cast<int>(std::thread::hardware_concurrency());
-			if (n <= 0) n = 1;
-			// Past this the transform stops being the bottleneck and the
-			// scheduler noise costs more than the extra core returns.
-			n = std::min(n, 8);
-		}
-		// Blocks below this are not worth a thread hand-off.
-		const int min_frames_per_thread = 512;
-		n = std::min(n, std::max(1, total_frames / min_frames_per_thread));
-		return std::max(1, n);
-	}
+	//! Frames below this are not worth a thread hand-off.
+	const int min_frames_per_thread = 512;
 }
 
 bool compute_odf(const float * mono, std::size_t count, unsigned sample_rate,
@@ -225,7 +210,7 @@ bool compute_odf(const float * mono, std::size_t count, unsigned sample_rate,
 	out.data.assign(static_cast<std::size_t>(odf::band_count) * out.frames, 0.0f);
 	plan.out = out.data.data();
 
-	const int n_threads = resolve_threads(threads, total_frames);
+	const int n_threads = resolve_threads(threads, total_frames, min_frames_per_thread);
 	if (n_threads <= 1)
 	{
 		stft_worker worker(plan);

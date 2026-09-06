@@ -14,11 +14,6 @@ namespace
 
 	const double buffer_max_seconds = 900.0;
 
-	//! Samples converted between listener polls in the one-shot path. Small
-	//! enough that an abort is noticed promptly, large enough that the poll is
-	//! nowhere near the cost of the conversion.
-	const std::size_t resample_chunk = 1u << 16;
-
 	//! The analysis proper, on mono already at the rate it will be analysed at.
 	analysis run_analysis(const float * mono, std::size_t count, unsigned sample_rate,
 	                      listener * l, const options * opt)
@@ -37,7 +32,7 @@ namespace
 		std::vector<double> acf;
 		autocorrelate(novelty, acf,
 		              static_cast<int>(std::lround(acf_max_lag_seconds * o.frame_rate)),
-		              o.frame_rate);
+		              o.frame_rate, threads);
 		if (acf.empty()) return result;
 
 		if (l != nullptr && l->cancelled()) return result;
@@ -71,14 +66,13 @@ analysis analyse(const float * mono, std::size_t count, unsigned sample_rate,
 		resampler rs(sample_rate, odf_model_rate);
 		if (rs.valid())
 		{
+			// Converted in one call rather than in chunks with an abort poll
+			// between them: even a quarter of an hour of audio is a fraction of
+			// a second here, and `compute_odf` polls from then on. The component
+			// does not come through this path at all - its collector converts as
+			// the decoder produces audio, inside a loop that already aborts.
 			std::vector<float> converted;
-			converted.reserve(rs.expected_output(count));
-			for (std::size_t at = 0; at < count; at += resample_chunk)
-			{
-				if (l != nullptr && l->cancelled()) return analysis();
-				rs.process(mono + at, std::min(resample_chunk, count - at), converted);
-			}
-			rs.flush(converted);
+			rs.convert_all(mono, count, converted, opt != nullptr ? opt->threads : 0);
 			return run_analysis(converted.data(), converted.size(),
 			                    rs.rate_out(), l, opt);
 		}

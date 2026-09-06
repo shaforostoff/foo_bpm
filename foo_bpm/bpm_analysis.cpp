@@ -3,6 +3,8 @@
 #include "bpm_auto_analysis.h"
 #include "preferences.h"
 
+#include <chrono>
+
 /***** Analysis entry point *****/
 //
 // The tango engine runs one pass over the whole track: onset envelope, windowed
@@ -39,9 +41,15 @@ namespace
 	{
 		bpmcore::analysis result;
 
+		const auto started = std::chrono::steady_clock::now();
+
 		input_helper input;
 		service_ptr_t<file> nothing;
-		input.open(nothing, track, 0, abort, false, false);
+		// The whole side is read once, front to back, and never seeked. Saying
+		// so lets a decoder skip building a seektable it will not be asked for,
+		// and stops a format that carries looping metadata from being decoded
+		// round and round until the length cap stops it.
+		input.open(nothing, track, input_flag_simpledecode, abort, false, false);
 		if (!input.is_open())
 		{
 			FB2K_console_formatter() << "foo_bpm: could not open " << track->get_path() << " for analysis.";
@@ -89,10 +97,21 @@ namespace
 		}
 
 		status.set_progress_secondary(250, 1000);
+		const auto decoded = std::chrono::steady_clock::now();
 
 		fb2k_listener listener(status, abort);
 		result = collector->finish(&listener);
 		abort.check();
+		const auto analysed = std::chrono::steady_clock::now();
+
+		// Two numbers rather than one, because they have nothing to do with each
+		// other and only one of them is this component's to fix. Reading a track
+		// is the decoder's cost and dwarfs the rest on a slow codec or a network
+		// share; the analysis runs at hundreds of times realtime.
+		const double read_seconds =
+			std::chrono::duration<double>(decoded - started).count();
+		const double analysis_seconds =
+			std::chrono::duration<double>(analysed - decoded).count();
 
 		if (!result.ok)
 		{
@@ -107,7 +126,10 @@ namespace
 				<< " -> " << pfc::format_float(result.bpm, 0, 2) << " BPM, "
 				<< bpmcore::rhythm_name(result.rhythm)
 				<< " (p=" << pfc::format_float(result.confidence, 0, 2) << "), beat "
-				<< pfc::format_float(result.beat_bpm, 0, 2) << " BPM, " << result.meter << "/4 grid";
+				<< pfc::format_float(result.beat_bpm, 0, 2) << " BPM, " << result.meter << "/4 grid; "
+				<< pfc::format_float(result.duration, 0, 1) << "s of audio, "
+				<< pfc::format_float(read_seconds, 0, 2) << "s to read, "
+				<< pfc::format_float(analysis_seconds, 0, 2) << "s to analyse";
 		}
 
 		return result;

@@ -78,7 +78,19 @@ public:
 	//! Emits the tail, so the output covers the input's duration exactly.
 	void flush(std::vector<float> & out);
 
+	//! Converts a whole buffer at once, across `threads` threads.
+	//!
+	//! Every output sample is an independent dot product over a fixed window of
+	//! the input, so how the range is divided cannot change the result - this
+	//! agrees with `process` followed by `flush` bit for bit, which the harness
+	//! checks. Only valid on a resampler nothing has been fed yet.
+	void convert_all(const float * in, std::size_t count, std::vector<float> & out,
+	                 int threads);
+
 private:
+	//! One output sample, from input samples that may run off either end.
+	float tap_edges(std::int64_t at, const float * in, std::size_t count) const;
+
 	int m_phases = 0;              //!< interpolation factor, L
 	int m_decim = 0;               //!< decimation factor, M
 	int m_taps = 0;                //!< coefficients per phase
@@ -115,7 +127,7 @@ void make_novelty(std::vector<float> & x, double frame_rate);
 //! bars - a bandoneon variation, a singer's rubato - pass without dragging the
 //! answer down, which is what the hand tapping did too.
 void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
-                   int max_lag, double frame_rate);
+                   int max_lag, double frame_rate, int threads = 0);
 //! Joint search over beat period and meter.
 grid find_grid(const std::vector<double> & acf, double frame_rate);
 //! Sharpen a beat period against every harmonic of itself at once.

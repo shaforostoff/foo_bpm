@@ -13,6 +13,7 @@ add_library(bpmcore STATIC
 
     bpmcore.h
     internal.h
+    parallel.h
     rhythm_model.h)
 
 # Consumers say #include <bpmcore/bpmcore.h>.

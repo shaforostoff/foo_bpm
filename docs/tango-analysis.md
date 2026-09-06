@@ -230,15 +230,29 @@ optimisations below:
 
 | input rate |  1 thread | 2 threads | all cores | resampled |
 |------------|----------:|----------:|----------:|:---------:|
-| 22050      |    0.146s |    0.093s |    0.055s |     no    |
-| 32000      |    0.195s |    0.141s |    0.103s |    yes    |
-| 44100      |    0.211s |    0.134s |    0.076s |     no    |
-| 48000      |    0.207s |    0.151s |    0.122s |    yes    |
-| 88200      |    0.381s |    0.238s |    0.132s |     no    |
+| 11025      |    0.079s |    0.048s |    0.020s |     no    |
+| 22050      |    0.146s |    0.088s |    0.039s |     no    |
+| 32000      |    0.193s |    0.116s |    0.059s |    yes    |
+| 44100      |    0.208s |    0.125s |    0.064s |     no    |
+| 48000      |    0.202s |    0.121s |    0.057s |    yes    |
+| 88200      |    0.373s |    0.228s |    0.119s |     no    |
 
-Resampling is roughly free on one thread — the smaller transform pays for the
-filter — but it is the one stage that is still serial, so it shows up as a
-regression once the transform is spread across cores.
+Resampling is close to free even on one thread — the smaller transform very
+nearly pays for the filter — and 48kHz now comes out *faster* than 44.1kHz
+despite the extra stage, because it is analysed at 22.05kHz where the transform
+is a quarter of the size.
+
+Where the time goes at 22.05kHz, on one thread and on all cores:
+
+| stage      | 1 thread | all cores |
+|------------|---------:|----------:|
+| envelope   |  0.1221s |   0.0282s |
+| autocorr   |  0.0110s |   0.0034s |
+| features   |  0.0010s |   0.0015s |
+| everything else | 0.0004s | 0.0006s |
+
+And inside the envelope, measured by stubbing each piece out in turn: the
+transform and the loops around it are 65%, `log` is 32%, `sqrt` is 3%.
 
 The spectral stage is 90–97% of the run time; nothing else is worth optimising
 until it is. What was done:
@@ -260,6 +274,20 @@ until it is. What was done:
   counter, and each block re-derives the frame before its first, so the envelope
   is **bit-identical whatever the thread count** — verified in the test harness.
   On two cores this is worth about 1.55×.
+* **The autocorrelation is threaded too**, over windows rather than over lags.
+  The windows do not interact — the median that reduces them is taken
+  afterwards, lag by lag — so a slot is reserved per window and filled in
+  parallel. It was 8% of the run on one thread and 20% once the envelope was
+  spread out; that is now 3.4ms.
+* **So is the resampler**, over output blocks. Every output sample is an
+  independent dot product over a fixed window of the input, so how the range is
+  divided cannot change a bit of it. The samples at each end of the track are
+  gathered into a zero-padded window and put through the *same* dot product
+  rather than summed with the missing taps skipped — skipping them would sum in
+  a different order and the two paths have to agree exactly.
+* **Four accumulators in the filter's inner loop.** MSVC will not reassociate
+  float addition, so a single running total stays scalar; four independent ones
+  let it use the whole vector unit and are still deterministic.
 
 Resampling used to be on the *not done* list, on the grounds that a decimating
 FIR good enough to keep aliasing out of the 3200–8000Hz band costs about as much
@@ -272,9 +300,43 @@ feeds and one that costs a fraction of it: 40 taps per output sample for 80dB of
 alias rejection, measured at 82–88dB, with the passband flat to 0.01% out to
 7900Hz.
 
-Still deliberately *not* done: analysing 44.1kHz through the resampler. It would
-halve the transform, and the filter is now cheap enough to be worth it, but it
-would move every answer on the rates that carry the measured accuracy.
+Still deliberately *not* done:
+
+* **Analysing 44.1kHz through the resampler.** It halves the transform, and the
+  filter is cheap enough now, but measured end to end it is worth only 7% on one
+  thread and 16% on all cores — the filter eats most of what the smaller
+  transform saves. For that it would move every answer on the rate that carries
+  the measured accuracy. 88.2kHz would gain more, around 37%, but it is rare and
+  the same objection applies.
+* **Float precision.** A float transform and `logf` would be worth something like
+  40% of the envelope between them. But the classifier is gradient boosted trees
+  splitting on hard thresholds, so a feature moving in its last bits is enough to
+  hand back a different probability, and on a near-tie a different rhythm. Not a
+  trade worth making on a stage that already runs at 4300× realtime.
+* **Analysing less than the whole track.** The median across autocorrelation
+  windows is what makes the estimate robust, and fewer windows is a weaker
+  median. It would cut the decode, which is the part that actually costs — but
+  see below for what to do about that instead.
+
+### The decode, not the analysis
+
+In the component the analysis is not what takes the time. A three-minute side is
+0.04–0.06s of analysis and anywhere from a fraction of a second to tens of
+seconds of decoding, depending on the codec and where the file lives — Monkey's
+Audio at its higher compression settings runs at ten or twenty times realtime,
+and a network share can be worse. Two things follow:
+
+* The decode is opened with `input_flag_simpledecode`. The whole side is read
+  once, front to back, and never seeked, so a decoder need not build a seektable
+  it will never be asked for; and a format carrying looping metadata is not
+  decoded round and round until the length cap stops it.
+* With *output debug information* on, each track logs its audio length, the time
+  to read it and the time to analyse it as separate numbers. They have nothing to
+  do with each other and only one of them is this component's to fix.
+
+Tracks are still analysed one at a time, so a library scan is bounded by one
+decoder on one core. Running several tracks at once is the obvious next step and
+the only one that would help a slow codec.
 
 
 Reproducing the model
