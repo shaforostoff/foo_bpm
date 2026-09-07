@@ -49,7 +49,8 @@ extern cfg_int bpm_config_seconds_to_reset_average;
 // the switch that turns the legacy engine back on does not belong next to
 // them.
 extern advconfig_checkbox_factory bpm_config_use_legacy_engine;
-extern advconfig_checkbox_factory bpm_config_write_rhythm_tag;
-extern advconfig_string_factory bpm_config_rhythm_tag;
+// Not defined at present - see the note in preferences.cpp.
+//extern advconfig_checkbox_factory bpm_config_write_rhythm_tag;
+//extern advconfig_string_factory bpm_config_rhythm_tag;
 
 #endif

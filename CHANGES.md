@@ -21,10 +21,16 @@ Change Log
   is absent when no track had one. It shows the string the file carried rather
   than a reformatted number, because a whole number and a decimal mean
   different things here.
-* The rhythm is no longer written to a tag. The code is commented out rather
-  than removed, in `rhythm_tag_or_empty`, and the rhythm is still detected and
-  still shown in the results window. The two advanced-config entries that used
-  to control it are still present and now have no effect.
+* The rhythm is no longer written to a tag, and the two advanced-config entries
+  that controlled it - *Write the detected rhythm to a tag* and *Rhythm tag
+  name* - are gone with it rather than left doing nothing. All of it is
+  commented out rather than deleted: the write in `rhythm_tag_or_empty`, the
+  factories in `preferences.cpp` and their declarations in `globals.h`. An
+  entry has no way to register itself and stay out of the preferences tree, so
+  not registering it is what hiding it amounts to; the settings themselves are
+  keyed by GUID in foobar2000's configuration and survive untouched, so
+  restoring those lines restores the entries and their old values. The rhythm
+  is still detected and still shown in the results window.
 * The tempo a track opens at is measured, shown in the results window as
   *Initial BPM* and written to an `INITIALBPM` tag, named after the
   `INITIALKEY` other taggers write. It is the median of the first three

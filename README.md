@@ -58,16 +58,21 @@ To work on it in Visual Studio, configure once and open the generated solution:
 
 ### Settings
 
-The preferences page is unchanged. Three entries live under **Preferences >
+The preferences page is unchanged. One entry lives under **Preferences >
 Advanced > Tools > Rubato BPM Analyzer**:
 
 * *Use the legacy BPM engine* - the original 2009 algorithm. The preferences
   page's STFT and candidate-selection controls only apply to it.
-* *Write the detected rhythm to a tag* and *Rhythm tag name* - **both do
-  nothing at present.** Writing the rhythm to a tag is commented out in
-  `rhythm_tag_or_empty` in `foo_rubato/bpm_result_dialog.cpp`; restoring the two
-  lines there gives these entries their effect back. The detected rhythm is
-  still shown in the results window either way.
+
+*Write the detected rhythm to a tag* and *Rhythm tag name* used to sit beside
+it and are gone: the rhythm is not written to a tag any more, so the entries
+that controlled it would have done nothing. An advanced-config entry cannot
+register itself and stay out of the tree, so hiding them means not registering
+them - they are commented out in `preferences.cpp`, alongside the write itself
+in `rhythm_tag_or_empty` in `bpm_result_dialog.cpp`, and restoring both places
+brings them back. Whatever they were set to is still in foobar2000's
+configuration, keyed by GUID, so it survives. The detected rhythm is still
+shown in the results window throughout.
 
 ### Tempo fluctuation
 

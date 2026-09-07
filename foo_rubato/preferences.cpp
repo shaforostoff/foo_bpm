@@ -30,10 +30,21 @@ advconfig_checkbox_factory bpm_config_use_legacy_engine(
 	"Use the legacy BPM engine (the original 2009 algorithm)",
 	guid_bpm_config_use_legacy_engine, guid_bpm_advconfig_branch, 0, false);
 
-advconfig_checkbox_factory bpm_config_write_rhythm_tag(
-	"Write the detected rhythm to a tag", guid_bpm_config_write_rhythm_tag,
-	guid_bpm_advconfig_branch, 1, true);
-
-advconfig_string_factory bpm_config_rhythm_tag(
-	"Rhythm tag name", guid_bpm_config_rhythm_tag,
-	guid_bpm_advconfig_branch, 2, "RHYTHM");
+// Commented out together with the rhythm tag writing itself, in
+// rhythm_tag_or_empty in bpm_result_dialog.cpp. An advanced-config entry has no
+// way to register itself and stay out of the preferences tree - the flags on
+// these factories say whether a change needs a restart and what a string
+// contains, nothing about visibility - so not registering them is what hiding
+// them means. Both are declared in globals.h, commented out to match.
+//
+// Whatever these were set to is still in foobar2000's configuration, keyed by
+// GUID and untouched by their absence, so restoring these lines and the two in
+// rhythm_tag_or_empty brings back the entries and their old values with them.
+//
+//advconfig_checkbox_factory bpm_config_write_rhythm_tag(
+//	"Write the detected rhythm to a tag", guid_bpm_config_write_rhythm_tag,
+//	guid_bpm_advconfig_branch, 1, true);
+//
+//advconfig_string_factory bpm_config_rhythm_tag(
+//	"Rhythm tag name", guid_bpm_config_rhythm_tag,
+//	guid_bpm_advconfig_branch, 2, "RHYTHM");
