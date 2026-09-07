@@ -45,6 +45,22 @@ Change Log
   analyse all of them, only the untagged ones, or none. A track whose info
   foobar2000 has not read yet is still skipped, but now says so in the console
   rather than vanishing.
+* Every checkbox on the preferences page carried `BS_CENTER`, which centres a
+  label in its control rather than setting it against the box. *Write tags
+  automatically* nearly fills its 93 units so it looked flush, but the two new
+  boxes are much shorter than theirs and appeared indented from the two above
+  them. Checkbox text belongs hard against the box, which is the default, so
+  the flag is gone. The widths went up with it - 130 in *Tagging*, 300 for the
+  console switch - as margin rather than as a fix: the labels all fitted, and
+  with the text left aligned the extra width only makes the click target reach
+  the end of the label instead of stopping short of it.
+* `dialog_test` draws the dialog templates out of the built DLL and checks that
+  every label fits the control around it, so a layout fault no longer needs
+  foobar2000 - or an eye - to find. `scripts\render_dialogs.ps1` writes one PNG
+  per dialog; the check alone runs as the `dialog_labels` CTest case and so is
+  part of every release build. It was written after the second of two faults
+  reached a release unseen, and the first thing it did was reproduce the one
+  above and then confirm its removal.
 * Tracks are scanned several at a time rather than one after another - two
   short of what the machine reports, and never fewer than one. Decoding is the
   whole cost of a scan: a 138-second side is a tenth of a second of analysis

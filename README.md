@@ -269,8 +269,11 @@ lower case in an iTunes freeform atom and the standard `TKEY` frame in ID3.
 * `kiss_fft` is built with `kiss_fft_scalar=double` as a PUBLIC define, so the
   library and the code including its headers cannot disagree about the layout
   of `kiss_fft_cpx`.
-* `kiss_fft_test` verifies the half-complex packing that `bpm_fft_impl_kissfft`
-  depends on, and is wired into CTest.
+* `kiss_fft_test` checks the vendored library against stored reference
+  spectra, and is wired into CTest. It existed for the half-complex packing the
+  legacy engine's FFT wrapper performed; that wrapper is gone and `bpmcore`
+  reads `kiss_fftr`'s bins directly, so what is left guards the dependency
+  `bpmcore` does still have.
 * `bpmcore_test` checks that the decision trees compiled into
   `bpmcore/rhythm_model.h` still reproduce the classifier they were exported
   from, and is wired into CTest too. It also runs the analysis over raw PCM:
@@ -282,8 +285,44 @@ lower case in an iTunes freeform atom and the standard `TKEY` frame in ID3.
 
   The `resample` case synthesises its own audio, so it runs in CI with no
   collection to hand. It is also wired into CTest.
+* `dialog_test` draws the dialog templates out of the built DLL and checks that
+  every label fits the control around it - see below. Wired into CTest as
+  `dialog_labels`.
 
 `build\`, `external\` and `dist\` are all ignored by git.
+
+### Looking at the dialogs without foobar2000
+
+The preferences page, the results window and the manual tap dialog cannot be
+opened without foobar2000, and for a long time they were only ever compiled.
+Two layout faults reached a release that way: a results window whose columns
+were sized by guesswork, and three checkboxes carrying `BS_CENTER`, which sets
+a short label adrift in the middle of its control instead of against the box.
+Neither is visible in the `.rc` file, and both are obvious the moment the thing
+is drawn.
+
+A dialog template is only a resource, though, and the dialog manager will build
+one from any process. So they can be drawn from the built DLL alone:
+
+    .\scripts\render_dialogs.ps1              # one PNG per dialog, in build\x64\dialogs\
+    .\scripts\render_dialogs.ps1 -Arch x86 -Show
+
+The label check runs without the images as the `dialog_labels` CTest case, so
+`build_release.ps1` catches a clipped label on its own. It reports what each
+label needs against what its control has, in pixels, and exits 77 - which CTest
+reads as a skip - where there is no desktop to draw on.
+
+What it cannot show is anything the component fills in at run time: the results
+window's columns and rows, the combo box items, the contents of edit controls,
+which check is set. Geometry and the text baked into the template are what is
+being looked at, which is where both of those faults lived.
+
+`-Font` redraws with a face of your choosing, to ask what a host restyling the
+page would do. Use it knowing what it means. The dialog manager derives dialog
+units from the template's own `FONT`, so every control rectangle is already
+expressed in terms of that face; pushing a wider one onto controls sized from a
+narrower one reports healthy labels as clipped. That mistake cost an hour, and
+the flag is kept mostly to make it namable.
 
 Using the analysis elsewhere
 ----------------------------
