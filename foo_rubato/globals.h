@@ -26,30 +26,14 @@
 extern cfg_int bpm_config_bpm_precision;
 extern cfg_string bpm_config_bpm_tag;
 extern cfg_bool bpm_config_auto_write_tag;
-// Auto
-extern cfg_int bpm_config_seconds_to_read;
-extern cfg_int bpm_config_num_bpms_to_calc;
-extern cfg_int bpm_config_offset_pct_min;
-extern cfg_int bpm_config_offset_pct_max;
-extern cfg_int bpm_config_fft_window_size;
-extern cfg_int bpm_config_fft_window_slide;
-extern cfg_int bpm_config_fft_window_type;
-extern cfg_int bpm_config_bpm_min;
-extern cfg_int bpm_config_bpm_max;
-extern cfg_bool bpm_config_interpolate_flux;
-extern cfg_int bpm_config_candidate_selection;
+// Diagnostics
 extern cfg_bool bpm_config_output_debug;
 // Manual
 extern cfg_int bpm_config_taps_to_average;
 extern cfg_int bpm_config_seconds_to_reset_average;
 
-// Advanced preferences. These live under Preferences > Advanced > Tools >
-// Rubato BPM Analyzer rather than on the component's own page: the page's
-// STFT and candidate-selection controls only apply to the legacy engine, and
-// the switch that turns the legacy engine back on does not belong next to
-// them.
-extern advconfig_checkbox_factory bpm_config_use_legacy_engine;
-// Not defined at present - see the note in preferences.cpp.
+// Advanced preferences. None are registered at present - see the note in
+// preferences.cpp for why, and for how to bring these two back.
 //extern advconfig_checkbox_factory bpm_config_write_rhythm_tag;
 //extern advconfig_string_factory bpm_config_rhythm_tag;
 

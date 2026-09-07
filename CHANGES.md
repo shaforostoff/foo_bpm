@@ -21,6 +21,30 @@ Change Log
   is absent when no track had one. It shows the string the file carried rather
   than a reformatted number, because a whole number and a decimal mean
   different things here.
+* The legacy 2009 engine is deleted, and the preferences page with it. It was
+  off by default and unreachable without the advanced switch, had no test
+  coverage - both harnesses link bpmcore alone and it lived in the component -
+  and had not been touched substantively since the 2025 SDK port. It also
+  produced two wrong outputs whenever it was switched on: it filled in only a
+  BPM, so the rhythm column read "Other" for every track where no classifier
+  had run, and its results were stamped `BpmAlgorithm=Rubato` for a number the
+  2009 algorithm produced, which defeats the point of an attribution.
+* That removes 873 lines - the engine, its FFT wrapper and its maths header -
+  and nine of the preferences page's controls with them: seconds per sample,
+  samples per song, sample offset range, calculated BPM range, BPM candidate
+  result, interpolate flux, and the three FFT settings. Every one of them was
+  read only by the deleted engine; the tango engine's geometry is fixed by the
+  model it was fitted to. *Calculated BPM range* was the one worth being rid
+  of: it defaulted to 75-195, and a milonga at 54 or a vals at 61 sits outside
+  that, so had it ever applied to the new engine it would have broken it.
+* What is left on the page is what a user would actually choose: **Tagging**
+  (BPM precision, tag name, write without showing the results), **Manual
+  Analysis** (taps to average, reset pause), and **Diagnostics** (console
+  output). The console switch was the one live control stranded in the dead
+  group, and its label no longer promises a BPM candidate list. The page is
+  122 dialog units tall rather than 296.
+* Nothing is registered under Preferences > Advanced > Tools any more, so the
+  branch is not registered either - an empty node would be worse than none.
 * The about box says what the component now does rather than "automatically
   analysing the BPM of audio files", and carries a 2026 copyright for Nick
   Shaforostov alongside the original authors'.

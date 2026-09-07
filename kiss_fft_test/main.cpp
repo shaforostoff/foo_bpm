@@ -1,5 +1,6 @@
-// Regression test for the half-complex packing that bpm_fft_impl_kissfft
-// performs: a real input transformed to
+// Regression test for kiss_fft itself, against stored reference spectra.
+//
+// It checks a real input transformed and then packed half-complex as
 //
 //     out[0..n/2]   real parts
 //     out[n-k]      imaginary part of bin k, for k in 1..(n-1)/2

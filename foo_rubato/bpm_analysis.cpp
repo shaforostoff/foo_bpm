@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "bpm_analysis.h"
-#include "bpm_auto_analysis.h"
 #include "preferences.h"
 
 #include <chrono>
@@ -143,14 +142,5 @@ bpmcore::analysis bpm_analyse(const metadb_handle_ptr & track,
                               threaded_process_status & status,
                               abort_callback & abort)
 {
-	if (!bpm_config_use_legacy_engine.get())
-	{
-		return run_tango_engine(track, status, abort);
-	}
-
-	bpmcore::analysis result;
-	bpm_auto_analysis legacy(track);
-	result.bpm = legacy.run_safe(status, abort);
-	result.ok = result.bpm > 0;
-	return result;
+	return run_tango_engine(track, status, abort);
 }

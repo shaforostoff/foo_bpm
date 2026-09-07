@@ -28,11 +28,8 @@ configure_file(version.h.in "${CMAKE_CURRENT_BINARY_DIR}/version.h" @ONLY)
 
 add_library(foo_rubato MODULE
     bpm_analysis.cpp
-    bpm_auto_analysis.cpp
     bpm_auto_analysis_thread.cpp
     bpm_contextmenu_item.cpp
-    bpm_fft.cpp
-    bpm_fft_impl_kissfft.cpp
     bpm_manual_dialog.cpp
     bpm_preferences_page.cpp
     bpm_result_dialog.cpp
@@ -44,15 +41,11 @@ add_library(foo_rubato MODULE
     foo_rubato.rc
 
     bpm_analysis.h
-    bpm_auto_analysis.h
     bpm_auto_analysis_thread.h
     bpm_contextmenu_item.h
-    bpm_fft.h
-    bpm_fft_impl_kissfft.h
     bpm_manual_dialog.h
     bpm_preferences_page.h
     bpm_result_dialog.h
-    bpm_math.h
     file_info_filter_bpm.h
     file_info_filter_scale_bpm.h
     format_bpm.h

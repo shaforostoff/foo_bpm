@@ -58,21 +58,33 @@ To work on it in Visual Studio, configure once and open the generated solution:
 
 ### Settings
 
-The preferences page is unchanged. One entry lives under **Preferences >
-Advanced > Tools > Rubato BPM Analyzer**:
+Everything the analysis needs is fixed by the model it was fitted to, so what
+is left on the preferences page is what a user would actually choose:
 
-* *Use the legacy BPM engine* - the original 2009 algorithm. The preferences
-  page's STFT and candidate-selection controls only apply to it.
+* **Tagging** - the BPM precision, the BPM tag name, and whether to write tags
+  without showing the results window.
+* **Manual Analysis** - taps to average, and how long a pause resets the
+  average, for the tapping dialog.
+* **Diagnostics** - whether each track's analysis goes to the console.
 
-*Write the detected rhythm to a tag* and *Rhythm tag name* used to sit beside
-it and are gone: the rhythm is not written to a tag any more, so the entries
-that controlled it would have done nothing. An advanced-config entry cannot
-register itself and stay out of the tree, so hiding them means not registering
-them - they are commented out in `preferences.cpp`, alongside the write itself
-in `rhythm_tag_or_empty` in `bpm_result_dialog.cpp`, and restoring both places
-brings them back. Whatever they were set to is still in foobar2000's
-configuration, keyed by GUID, so it survives. The detected rhythm is still
-shown in the results window throughout.
+There is nothing under **Preferences > Advanced > Tools** any more. Everything
+that was there has gone: the legacy-engine switch with the engine itself, and
+the two rhythm-tag entries with the tag writing, which is commented out in
+`rhythm_tag_or_empty` in `bpm_result_dialog.cpp`. An advanced-config entry
+cannot register itself and stay out of the tree, so hiding one means not
+registering it; those are commented out in `preferences.cpp` along with the
+branch, and restoring all three places brings them back with their old values,
+which persist in foobar2000's configuration keyed by GUID either way. The
+rhythm is still detected and still shown in the results window.
+
+The nine STFT and candidate-selection controls that used to fill an *Automatic
+Analysis* group are gone with the engine that read them. That was the original
+2009 algorithm, kept switchable through the 2025 port and removed in 0.1.0: it
+was off by default, unreachable without the advanced switch, untested - both
+harnesses link `bpmcore` alone, and it lived in the component - and it filled
+in only a BPM, so it left the rhythm reading "Other" for every track and had
+its results stamped `BpmAlgorithm=Rubato`, which was not true. It is in git
+history if it is ever wanted.
 
 ### Tempo fluctuation
 

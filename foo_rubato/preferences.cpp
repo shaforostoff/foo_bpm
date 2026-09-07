@@ -5,41 +5,31 @@
 cfg_int bpm_config_bpm_precision(guid_bpm_config_bpm_precision, BPM_PRECISION_1);
 cfg_string bpm_config_bpm_tag(guid_bpm_config_bpm_tag, "BPM");
 cfg_bool bpm_config_auto_write_tag(guid_bpm_config_auto_write_tag, false);
-// Auto
-cfg_int bpm_config_seconds_to_read(guid_bpm_config_seconds_to_read, 10);
-cfg_int bpm_config_num_bpms_to_calc(guid_bpm_config_num_bpms_to_calc, 10);
-cfg_int bpm_config_offset_pct_min(guid_bpm_config_offset_pct_min, 20);
-cfg_int bpm_config_offset_pct_max(guid_bpm_config_offset_pct_max, 80);
-cfg_int bpm_config_fft_window_size(guid_bpm_config_fft_window_size, FFT_SIZE_2048);
-cfg_int bpm_config_fft_window_slide(guid_bpm_config_fft_window_slide, FFT_SLIDE_AUTO);
-cfg_int bpm_config_fft_window_type(guid_bpm_config_window_type, FFT_WINDOW_HAMMING);
-cfg_int bpm_config_bpm_min(guid_bpm_config_bpm_min, 75);
-cfg_int bpm_config_bpm_max(guid_bpm_config_bpm_max, 195);
-cfg_bool bpm_config_interpolate_flux(guid_bpm_config_interpolate_flux, true);
-cfg_int bpm_config_candidate_selection(guid_bpm_config_candidate_selection, 0);
+// Diagnostics
 cfg_bool bpm_config_output_debug(guid_bpm_config_output_debug, false);
 // Manual
 cfg_int bpm_config_taps_to_average(guid_bpm_config_taps_to_average, 30);
 cfg_int bpm_config_seconds_to_reset_average(guid_bpm_config_seconds_to_reset_average, 5);
 
-// Advanced preferences
-static advconfig_branch_factory bpm_config_branch(
-	"Rubato BPM Analyzer", guid_bpm_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
-
-advconfig_checkbox_factory bpm_config_use_legacy_engine(
-	"Use the legacy BPM engine (the original 2009 algorithm)",
-	guid_bpm_config_use_legacy_engine, guid_bpm_advconfig_branch, 0, false);
-
-// Commented out together with the rhythm tag writing itself, in
-// rhythm_tag_or_empty in bpm_result_dialog.cpp. An advanced-config entry has no
-// way to register itself and stay out of the preferences tree - the flags on
-// these factories say whether a change needs a restart and what a string
-// contains, nothing about visibility - so not registering them is what hiding
-// them means. Both are declared in globals.h, commented out to match.
+// Advanced preferences - none at present, so the branch is not registered
+// either: an empty node under Preferences > Advanced > Tools would be worse
+// than no node. The switch that used to live here selected the legacy 2009
+// engine, which is gone.
 //
-// Whatever these were set to is still in foobar2000's configuration, keyed by
-// GUID and untouched by their absence, so restoring these lines and the two in
-// rhythm_tag_or_empty brings back the entries and their old values with them.
+// An advanced-config entry has no way to register itself and stay out of the
+// tree - the flags on these factories say whether a change needs a restart and
+// what a string holds, nothing about visibility - so not registering is what
+// hiding amounts to. The rhythm entries below are commented out alongside the
+// tag writing itself, in rhythm_tag_or_empty in bpm_result_dialog.cpp, and are
+// declared in globals.h commented out to match. Restoring them means restoring
+// the branch with them.
+//
+// None of these settings is lost meanwhile. They persist into foobar2000's own
+// configuration keyed by GUID, untouched by the absence of the code that reads
+// them, so whatever they held comes back when the code does.
+//
+//static advconfig_branch_factory bpm_config_branch(
+//	"Rubato BPM Analyzer", guid_bpm_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
 //
 //advconfig_checkbox_factory bpm_config_write_rhythm_tag(
 //	"Write the detected rhythm to a tag", guid_bpm_config_write_rhythm_tag,
