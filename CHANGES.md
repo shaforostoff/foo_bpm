@@ -15,6 +15,19 @@ Change Log
   separate context menus and separate settings, and can be run side by side to
   compare them. Point them at different BPM tag names before doing that, or
   they will overwrite each other's answers.
+* **Tagging** on the preferences page gained two checkboxes, both on by
+  default: whether to write `INITIALBPM` and whether to write `BpmAlgorithm`
+  beside the BPM. Someone who wants nothing in their files but the BPM itself
+  can now say so, without giving up the analysis that produces the rest.
+* Unchecking one stops the field being *added*; it does not license leaving
+  behind a claim known to be false. Removal stays unconditional, so tapping a
+  BPM by hand over a measured one still clears the attribution, and a BPM with
+  no measurable opening still clears `INITIALBPM`, whatever the checkboxes say
+  - the alternative is a file describing a measurement that is no longer
+  there. The switches do cost the reverse inference: with the attribution
+  turned off, a missing `BpmAlgorithm` no longer means the BPM was tapped.
+* The preferences page is 152 dialog units tall, the *Tagging* group having
+  grown by 30 to hold them.
 * The results window shows a **BPM from tag** column when at least one of the
   scanned tracks already carried a BPM tag, so a fresh measurement can be read
   against the value that was there - a hand tap, on this collection. The column
@@ -75,8 +88,8 @@ Change Log
   (BPM precision, tag name, write without showing the results), **Manual
   Analysis** (taps to average, reset pause), and **Diagnostics** (console
   output). The console switch was the one live control stranded in the dead
-  group, and its label no longer promises a BPM candidate list. The page is
-  122 dialog units tall rather than 296.
+  group, and its label no longer promises a BPM candidate list. That took the
+  page from 296 dialog units to 122.
 * Nothing is registered under Preferences > Advanced > Tools any more, so the
   branch is not registered either - an empty node would be worse than none.
 * The about box says what the component now does rather than "automatically

@@ -38,6 +38,13 @@ private:
 	pfc::string8 m_rhythm_tag;
 	//! True for analysis results, false for a hand-tapped BPM.
 	bool m_from_analysis;
+	//! The preferences-page switches, read once when the filter is built
+	//! rather than per track, so a setting changed while foobar2000 is part
+	//! way through writing a selection cannot apply to only half of it. They
+	//! govern writing alone: a field that would otherwise describe a different
+	//! measurement from the BPM beside it is still removed either way.
+	bool m_write_initial;
+	bool m_write_algorithm;
 };
 
 #endif // __FILE_INFO_FILTER_BPM_H__

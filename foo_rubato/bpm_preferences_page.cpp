@@ -11,6 +11,8 @@ void bpm_preferences_page::reset()
 	bpm_precision_box.SetCurSel(BPM_PRECISION_1);
 	SetDlgItemText(ID_CONFIG_BPM_TAG, _T("BPM"));
 	CheckDlgButton(ID_CONFIG_AUTO_WRITE_TAG, BST_UNCHECKED);
+	CheckDlgButton(ID_CONFIG_WRITE_INITIAL_BPM, BST_CHECKED);
+	CheckDlgButton(ID_CONFIG_WRITE_BPM_ALGORITHM, BST_CHECKED);
 
 	// Manual
 	SetDlgItemInt(ID_CONFIG_TAPS_TO_AVERAGE, 30, true);
@@ -33,6 +35,8 @@ BOOL bpm_preferences_page::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 	pfc::stringcvt::convert_ansi_to_wide(w_bpm_tag, 256, bpm_config_bpm_tag.get_ptr(), bpm_config_bpm_tag.length());
 	SetDlgItemText(ID_CONFIG_BPM_TAG, w_bpm_tag);
 	CheckDlgButton(ID_CONFIG_AUTO_WRITE_TAG, bpm_config_auto_write_tag ? BST_CHECKED : BST_UNCHECKED);
+	CheckDlgButton(ID_CONFIG_WRITE_INITIAL_BPM, bpm_config_write_initial_bpm ? BST_CHECKED : BST_UNCHECKED);
+	CheckDlgButton(ID_CONFIG_WRITE_BPM_ALGORITHM, bpm_config_write_bpm_algorithm ? BST_CHECKED : BST_UNCHECKED);
 
 	// Manual
 	SetDlgItemInt(ID_CONFIG_TAPS_TO_AVERAGE, bpm_config_taps_to_average, true);
@@ -90,6 +94,10 @@ void bpm_preferences_page::OnBnClicked(UINT uNotifyCode, int nID, CWindow wndCtl
 			break;
 		case ID_CONFIG_AUTO_WRITE_TAG:
 			break;
+		case ID_CONFIG_WRITE_INITIAL_BPM:
+			break;
+		case ID_CONFIG_WRITE_BPM_ALGORITHM:
+			break;
 		default:
 			break;
 	}
@@ -111,6 +119,8 @@ void bpm_preferences_page::apply()
 
 	bpm_config_output_debug = (IsDlgButtonChecked(ID_CONFIG_OUTPUT_DEBUG) == BST_CHECKED);
 	bpm_config_auto_write_tag = (IsDlgButtonChecked(ID_CONFIG_AUTO_WRITE_TAG) == BST_CHECKED);
+	bpm_config_write_initial_bpm = (IsDlgButtonChecked(ID_CONFIG_WRITE_INITIAL_BPM) == BST_CHECKED);
+	bpm_config_write_bpm_algorithm = (IsDlgButtonChecked(ID_CONFIG_WRITE_BPM_ALGORITHM) == BST_CHECKED);
 }
 
 t_uint32 bpm_preferences_page::get_state()
@@ -135,7 +145,9 @@ bool bpm_preferences_page::HasChanged()
 		bpm_config_taps_to_average != (int) GetDlgItemInt(ID_CONFIG_TAPS_TO_AVERAGE, NULL, false) ||
 		bpm_config_seconds_to_reset_average != (int) GetDlgItemInt(ID_CONFIG_SECONDS_TO_RESET_AVERAGE, NULL, false) ||
 		bpm_config_output_debug != (IsDlgButtonChecked(ID_CONFIG_OUTPUT_DEBUG) == BST_CHECKED) ||
-		bpm_config_auto_write_tag != (IsDlgButtonChecked(ID_CONFIG_AUTO_WRITE_TAG) == BST_CHECKED))
+		bpm_config_auto_write_tag != (IsDlgButtonChecked(ID_CONFIG_AUTO_WRITE_TAG) == BST_CHECKED) ||
+		bpm_config_write_initial_bpm != (IsDlgButtonChecked(ID_CONFIG_WRITE_INITIAL_BPM) == BST_CHECKED) ||
+		bpm_config_write_bpm_algorithm != (IsDlgButtonChecked(ID_CONFIG_WRITE_BPM_ALGORITHM) == BST_CHECKED))
 	{
 		changed = true;
 	}

@@ -61,8 +61,9 @@ To work on it in Visual Studio, configure once and open the generated solution:
 Everything the analysis needs is fixed by the model it was fitted to, so what
 is left on the preferences page is what a user would actually choose:
 
-* **Tagging** - the BPM precision, the BPM tag name, and whether to write tags
-  without showing the results window.
+* **Tagging** - the BPM precision, the BPM tag name, whether to write tags
+  without showing the results window, and whether to write `INITIALBPM` and
+  `BpmAlgorithm` beside the BPM. The last two are on by default.
 * **Manual Analysis** - taps to average, and how long a pause resets the
   average, for the tapping dialog.
 * **Diagnostics** - whether each track's analysis goes to the console.
@@ -233,6 +234,17 @@ result with the results dialog's own buttons before committing. An attribution
 left over from an earlier scan would otherwise be claiming credit for a number
 the analysis did not produce. So the presence of the field is a reliable way to
 tell a measured BPM from a corrected or hand-tapped one.
+
+Both fields can be turned off under **Tagging** on the preferences page, and
+both are on by default. Off means this component stops *adding* the field - not
+that it starts leaving a claim it knows to be false. Removal is unconditional:
+uncheck *Write BpmAlgorithm*, tap a BPM by hand over one that was measured, and
+the old attribution still goes, because the alternative is a file saying the
+analysis produced a number the user typed. The same holds for `INITIALBPM`,
+where a stale value would describe a different measurement from the BPM beside
+it. What the switches do cost is the reverse inference: with *Write
+BpmAlgorithm* off, a missing attribution no longer means the BPM was tapped,
+only that nothing wrote one.
 
 `INITIALBPM` follows the BPM rather than the attribution, because it is a
 measurement and not a claim about who made it: doubling or halving scales it,

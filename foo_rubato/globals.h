@@ -26,6 +26,8 @@
 extern cfg_int bpm_config_bpm_precision;
 extern cfg_string bpm_config_bpm_tag;
 extern cfg_bool bpm_config_auto_write_tag;
+extern cfg_bool bpm_config_write_initial_bpm;
+extern cfg_bool bpm_config_write_bpm_algorithm;
 // Diagnostics
 extern cfg_bool bpm_config_output_debug;
 // Manual

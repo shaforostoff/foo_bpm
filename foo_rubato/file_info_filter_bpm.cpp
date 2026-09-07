@@ -14,6 +14,8 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
                                            const std::vector<double> & p_initial_bpms)
 	: m_bpm_tag(p_bpm_tag), m_rhythm_tag(p_rhythm_tag != nullptr ? p_rhythm_tag : "")
 	, m_from_analysis(true)
+	, m_write_initial(bpm_config_write_initial_bpm)
+	, m_write_algorithm(bpm_config_write_bpm_algorithm)
 {
 	const bool have_rhythms = p_rhythms.size() == p_bpm_results.size() && !m_rhythm_tag.is_empty();
 	const bool have_adjusted = p_adjusted.size() == p_bpm_results.size();
@@ -44,6 +46,8 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
 file_info_filter_bpm::file_info_filter_bpm(metadb_handle_ptr p_track, const char * p_bpm_tag, double p_bpm_result)
 	: m_bpm_tag(p_bpm_tag)
 	, m_from_analysis(false)
+	, m_write_initial(bpm_config_write_initial_bpm)
+	, m_write_algorithm(bpm_config_write_bpm_algorithm)
 {
 	m_tracks.add_item(p_track);
 	m_bpm_results.push_back(p_bpm_result);
@@ -62,28 +66,38 @@ bool file_info_filter_bpm::apply_filter(metadb_handle_ptr p_track, t_filestats p
 		// tapped by hand, or doubled or halved by the user, an attribution left
 		// over from an earlier scan would be claiming credit for a number the
 		// analysis did not produce.
+		//
+		// The clearing is not the preferences page's to switch off. Turning the
+		// attribution off means this component stops adding one, not that it
+		// starts leaving behind a claim it knows to be false - which is the
+		// whole value of the field, its presence being what marks a BPM as
+		// measured rather than tapped.
 		const bool adjusted = index < m_adjusted.size() && m_adjusted[index];
-		if (m_from_analysis && !adjusted)
-		{
-			p_info.meta_set(BPM_ALGORITHM_TAG, FOO_RUBATO_ALGORITHM);
-		}
-		else
+		const bool ours = m_from_analysis && !adjusted;
+		if (!ours)
 		{
 			p_info.meta_remove_field(BPM_ALGORITHM_TAG);
+		}
+		else if (m_write_algorithm)
+		{
+			p_info.meta_set(BPM_ALGORITHM_TAG, FOO_RUBATO_ALGORITHM);
 		}
 
 		// The tempo the track opens at, which on a side that eases off for the
 		// singer is several BPM above the figure for the whole of it. Removed
 		// rather than left behind when there is none to write, so it can never
-		// describe a different measurement from the BPM beside it.
+		// describe a different measurement from the BPM beside it - again
+		// whatever the switch says, because that decides whether a new one is
+		// written, not whether a stale one may stand.
 		const double initial = index < m_initial_bpms.size() ? m_initial_bpms[index] : 0.0;
-		if (m_from_analysis && initial > 0)
-		{
-			p_info.meta_set(BPM_INITIAL_TAG, format_bpm(initial));
-		}
-		else
+		const bool have_initial = m_from_analysis && initial > 0;
+		if (!have_initial)
 		{
 			p_info.meta_remove_field(BPM_INITIAL_TAG);
+		}
+		else if (m_write_initial)
+		{
+			p_info.meta_set(BPM_INITIAL_TAG, format_bpm(initial));
 		}
 
 		if (index < m_rhythms.size() && !m_rhythm_tag.is_empty() && !m_rhythms[index].is_empty())
