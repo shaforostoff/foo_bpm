@@ -63,7 +63,9 @@ set_target_properties(foo_rubato PROPERTIES
     PREFIX ""
     SUFFIX ".dll")
 
-target_link_libraries(foo_rubato PRIVATE fb2k::sdk kiss_fft bpmcore)
+# kiss_fft is bpmcore's business now, and reaches the link through it: nothing
+# here has included a kiss_fft header since the legacy engine's wrapper went.
+target_link_libraries(foo_rubato PRIVATE fb2k::sdk bpmcore)
 
 # ... which is where the generated version.h lands.
 target_include_directories(foo_rubato PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")

@@ -1,8 +1,8 @@
 # KISS FFT, built for double precision to match the analyser's maths.
 #
 # kiss_fft_scalar has to agree everywhere the headers are included, so it is
-# PUBLIC: foo_bpm's wrapper sees the same kiss_fft_cpx layout this library was
-# compiled with.
+# PUBLIC: bpmcore, the only consumer that includes them, sees the same
+# kiss_fft_cpx layout this library was compiled with.
 
 add_library(kiss_fft STATIC
     src/kiss_fft.c
