@@ -6,6 +6,21 @@
 # assembles puts the x64 build in an x64\ subfolder, which is how foobar2000
 # tells the two apart.
 
+# The SDK release is pinned in scripts\get_sdk.ps1, alongside the URL and the
+# checksum, so that is where the about box gets it from rather than stating a
+# date of its own. WTL is pinned in the same file as '10.01', which the date
+# pattern here will not match.
+set(_get_sdk "${CMAKE_SOURCE_DIR}/scripts/get_sdk.ps1")
+file(READ "${_get_sdk}" _get_sdk_text)
+if(_get_sdk_text MATCHES "Version[ \t]*=[ \t]*'([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])'")
+    set(FOO_RUBATO_SDK_VERSION "${CMAKE_MATCH_1}")
+else()
+    message(WARNING "Could not read the SDK release out of ${_get_sdk}.")
+    set(FOO_RUBATO_SDK_VERSION "unknown")
+endif()
+# configure_file tracks version.h.in by itself, but not a file it merely read.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_get_sdk}")
+
 # The version reaches the sources only through this generated header, so
 # project(VERSION) at the top level stays its single home. @ONLY because the
 # template also holds ${}-free C preprocessor text.

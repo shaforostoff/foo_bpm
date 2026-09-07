@@ -21,6 +21,13 @@ Change Log
   is absent when no track had one. It shows the string the file carried rather
   than a reformatted number, because a whole number and a decimal mean
   different things here.
+* The about box says what the component now does rather than "automatically
+  analysing the BPM of audio files", and carries a 2026 copyright for Nick
+  Shaforostov alongside the original authors'.
+* The foobar2000 SDK release the about box quotes is read out of
+  scripts\get_sdk.ps1, where the download and its checksum are already pinned,
+  instead of being a second copy of the date. CMake reconfigures when that
+  script changes, so the two cannot drift the way the version once did.
 * The rhythm is no longer written to a tag, and the two advanced-config entries
   that controlled it - *Write the detected rhythm to a tag* and *Rhythm tag
   name* - are gone with it rather than left doing nothing. All of it is
