@@ -87,7 +87,7 @@ double bpm_auto_analysis::run_safe(threaded_process_status & thread_status, abor
 	}
 	catch (const std::exception &exc)
 	{
-		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ": " << exc;
+		FB2K_console_formatter() << "foo_rubato: Error analysing " << m_track->get_path() << ": " << exc;
 		return 0.0;
 	}
 }
@@ -103,7 +103,7 @@ double bpm_auto_analysis::run(threaded_process_status & thread_status, abort_cal
 	if (m_track->get_length() < seconds_to_read)
 	{
 		thread_status.set_progress_secondary(max_progress, max_progress);
-		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Track length too short. BPM set to zero.";
+		FB2K_console_formatter() << "foo_rubato: Error analysing " << m_track->get_path() << ". Track length too short. BPM set to zero.";
 		return 0;
 	}
 
@@ -159,11 +159,11 @@ double bpm_auto_analysis::run(threaded_process_status & thread_status, abort_cal
 	if (bpm_config_output_debug)
 	{
 		FB2K_console_formatter() << "\n";
-		FB2K_console_formatter() << "foo_bpm: Estimated BPMs (sorted) for " << pfc::string_filename_ext(m_track->get_path()) << " are:";
+		FB2K_console_formatter() << "foo_rubato: Estimated BPMs (sorted) for " << pfc::string_filename_ext(m_track->get_path()) << " are:";
 		for (unsigned i = 0; i < bpm_list.size(); i++)
 			FB2K_console_formatter() << "BPM " << i+1 << " = " << bpm_list[i];
 
-		FB2K_console_formatter() << "foo_bpm: Calculated BPM = " << bpm_result;
+		FB2K_console_formatter() << "foo_rubato: Calculated BPM = " << bpm_result;
 		FB2K_console_formatter() << "\n";
 	}
 
@@ -180,7 +180,7 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 
 	if (!input_file.is_open())
 	{
-		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". File could not be opened for analysis";
+		FB2K_console_formatter() << "foo_rubato: Error analysing " << m_track->get_path() << ". File could not be opened for analysis";
 		return false;
 	}
 
@@ -190,14 +190,14 @@ bool bpm_auto_analysis::read_file(double offset_pct, abort_callback &p_abort)
 	}
 	else
 	{
-		FB2K_console_formatter() << "foo_bpm: Warning - Failed to seek file " << m_track->get_path() << ". BPM result will be of first " << seconds_to_read << " seconds only.";
+		FB2K_console_formatter() << "foo_rubato: Warning - Failed to seek file " << m_track->get_path() << ". BPM result will be of first " << seconds_to_read << " seconds only.";
 	}
 
 	// Grab and ignore the first chunk as it will most likely have an odd sample chunk size
 	// TODO: Handle case where we reach EOF (run() returns false)
 	if (!input_file.run(chunk, p_abort))
 	{
-		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path() << ". Unexpected end of file found.";
+		FB2K_console_formatter() << "foo_rubato: Error analysing " << m_track->get_path() << ". Unexpected end of file found.";
 		return false;
 	}
 
@@ -282,7 +282,7 @@ void bpm_auto_analysis::calc_stft()
 	if (audio_buffer.size() < static_cast<size_t>(fft_window_size))
 	{
 		num_fft_windows = 0;
-		FB2K_console_formatter() << "foo_bpm: Error analysing " << m_track->get_path()
+		FB2K_console_formatter() << "foo_rubato: Error analysing " << m_track->get_path()
 		                         << ". Not enough audio decoded for one FFT window. BPM set to zero.";
 	}
 	else

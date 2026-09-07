@@ -14,7 +14,8 @@ bpm_result_dialog::bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc
 	m_tracks(p_tracks),
 	m_infos(p_infos),
 	m_bpm_results(p_bpm_results),
-	m_rhythms(p_rhythms)
+	m_rhythms(p_rhythms),
+	m_adjusted(p_bpm_results.size(), false)
 {
 }
 
@@ -39,7 +40,7 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 			m_tracks,
 			fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results,
 			                                        rhythm_tag.is_empty() ? nullptr : rhythm_tag.get_ptr(),
-			                                        m_rhythms),
+			                                        m_rhythms, m_adjusted),
 			core_api::get_main_window(),
 			metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 			NULL);
@@ -99,7 +100,7 @@ LRESULT bpm_result_dialog::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl)
 		m_tracks,
 		fb2k::service_new<file_info_filter_bpm>(m_tracks, bpm_config_bpm_tag, m_bpm_results,
 		                                        rhythm_tag.is_empty() ? nullptr : rhythm_tag.get_ptr(),
-		                                        m_rhythms),
+		                                        m_rhythms, m_adjusted),
 		core_api::get_main_window(),
 		metadb_io_v2::op_flag_background | metadb_io_v2::op_flag_delay_ui,
 		NULL);
@@ -174,6 +175,7 @@ void bpm_result_dialog::ScaleSelectionBPM(double p_factor)
 	while ((listview_index = ListView_GetNextItem(result_list, listview_index, LVIS_SELECTED)) != -1)
 	{
 		m_bpm_results[listview_index] = m_bpm_results[listview_index] * p_factor;
+		m_adjusted[listview_index] = true;
 
 		format_bpm bpm_value(m_bpm_results[listview_index]);
 

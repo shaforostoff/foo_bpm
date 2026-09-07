@@ -4,9 +4,10 @@
 # Builds the foobar2000 SDK as static libraries and exposes them through the
 # interface target `fb2k::sdk`.
 #
-# Unlike a DSP-only component, foo_bpm puts up dialogs and a preferences page,
-# so it needs the whole stack: pfc, the SDK proper, helpers/ (input_helper,
-# preferences_page_impl, uSetDlgItemText) and libPPUI (listview_helper). The
+# Unlike a DSP-only component, foo_rubato puts up dialogs and a preferences
+# page, so it needs the whole stack: pfc, the SDK proper, helpers/
+# (input_helper, preferences_page_impl, uSetDlgItemText) and libPPUI
+# (listview_helper). The
 # last two pull in ATL, which comes with Visual Studio, and WTL, which
 # scripts\get_sdk.ps1 fetches alongside the SDK.
 # ---------------------------------------------------------------------------
@@ -35,8 +36,8 @@ target_include_directories(fb2k_common SYSTEM INTERFACE
 target_compile_definitions(fb2k_common INTERFACE
     UNICODE _UNICODE
     _CRT_SECURE_NO_WARNINGS
-    _WIN32_WINNT=${FOO_BPM_WIN32_WINNT}
-    WINVER=${FOO_BPM_WIN32_WINNT})
+    _WIN32_WINNT=${FOO_RUBATO_WIN32_WINNT}
+    WINVER=${FOO_RUBATO_WIN32_WINNT})
 
 # --- pfc -------------------------------------------------------------------
 file(GLOB FB2K_PFC_SOURCES CONFIGURE_DEPENDS "${FB2K_SDK_DIR}/pfc/*.cpp")
@@ -64,9 +65,9 @@ target_link_libraries(fb2k_helpers PUBLIC fb2k_sdk_core fb2k_ppui)
 
 # --- shared.dll import library ---------------------------------------------
 # shared.dll ships with foobar2000 itself; the SDK only carries import libs.
-if(FOO_BPM_TARGET_ARCH STREQUAL "x64")
+if(FOO_RUBATO_TARGET_ARCH STREQUAL "x64")
     set(_fb2k_shared_lib "${FB2K_SDK_DIR}/foobar2000/shared/shared-x64.lib")
-elseif(FOO_BPM_TARGET_ARCH STREQUAL "ARM64EC")
+elseif(FOO_RUBATO_TARGET_ARCH STREQUAL "ARM64EC")
     set(_fb2k_shared_lib "${FB2K_SDK_DIR}/foobar2000/shared/shared-ARM64EC.lib")
 else()
     set(_fb2k_shared_lib "${FB2K_SDK_DIR}/foobar2000/shared/shared-Win32.lib")

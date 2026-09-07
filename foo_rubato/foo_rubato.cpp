@@ -23,7 +23,8 @@
 *
 *******************************************************************************
 *
-* foo_bpm.cpp - A foobar2000 component for automatically detecting a song's BPM
+* foo_rubato.cpp - A foobar2000 component for automatically detecting a
+* song's BPM
 *
 * REFERENCES:
 * BPM estimation algorithm based on:
@@ -88,9 +89,11 @@
 
 #include <SDK/foobar2000.h>
 
+#include "version.h"
+
 DECLARE_COMPONENT_VERSION(
-	"BPM Analyser",
-	"0.4.1",
+	FOO_RUBATO_NAME,
+	FOO_RUBATO_VERSION,
 	"A component for automatically analysing the BPM of audio files.\n"
 	"\n"
 	"Built against the foobar2000 SDK 2025-03-07; runs on 32 and 64 bit foobar2000.\n"
@@ -129,4 +132,4 @@ DECLARE_COMPONENT_VERSION(
 	"==== end of KISS FFT license ===="
 );
 
-VALIDATE_COMPONENT_FILENAME("foo_bpm.dll");
+VALIDATE_COMPONENT_FILENAME("foo_rubato.dll");

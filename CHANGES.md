@@ -1,8 +1,42 @@
-BPM Analyser for foobar2000
-===========================
+Rubato BPM Analyzer for foobar2000
+==================================
 
 Change Log
 ----------
+
+### Version 0.1.0
+
+* Renamed. BPM Analyser is now Rubato BPM Analyzer, the component is
+  `foo_rubato.dll` rather than `foo_bpm.dll`, and the version starts again at
+  0.1.0. Nothing about the analysis changed with the name; 0.4.2 below and
+  0.1.0 here are the same code.
+* It installs alongside BPM Analyser. foobar2000 tells components apart by
+  filename, and every GUID is new, so the two keep separate preferences pages,
+  separate context menus and separate settings, and can be run side by side to
+  compare them. Point them at different BPM tag names before doing that, or
+  they will overwrite each other's answers.
+* An analysis now records itself in a `BpmAlgorithm` tag, written alongside
+  the BPM as `Rubato;v=<version>` - the same field name shape and the same
+  `<name>;v=<version>` value as the `KeyAlgorithm` and `TuningAlgorithm`
+  fields other taggers write. Only a BPM the analysis stands behind gets it:
+  tapping one by hand in the manual dialog, doubling or halving one from the
+  context menu, and doubling or halving a result in the dialog before
+  committing all remove the field instead, since the analysis no longer
+  stands behind the value. Telling a measured BPM from a corrected or
+  hand-tapped one no longer means guessing from whether it has a decimal
+  point.
+* The version has one home. It was written out twice - `project(VERSION)` in
+  `CMakeLists.txt` and again in `DECLARE_COMPONENT_VERSION` - and the two had
+  drifted, so 0.4.2 shipped an about box reading 0.4.1. CMake now generates a
+  `version.h` from the project version, and the about box, the `BpmAlgorithm`
+  tag and the release archive name all read it from there.
+* Settings do not carry over, for the same reason. An existing BPM Analyser
+  install keeps its own configuration and this one starts at its defaults, so
+  the BPM tag name, the rhythm tag name and the STFT settings all need setting
+  again if they were ever changed.
+
+Earlier releases, as BPM Analyser
+---------------------------------
 
 ### Version 0.4.2
 

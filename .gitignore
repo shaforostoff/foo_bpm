@@ -11,3 +11,6 @@
 # The analysis pipeline's scratch lives under /build, which is already ignored.
 __pycache__/
 *.pyc
+
+# Generated from foo_rubato/version.h.in by CMake.
+foo_rubato/version.h

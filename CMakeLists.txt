@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# BPM Analyser for foobar2000
+# Rubato BPM Analyzer for foobar2000
 #
 #   cmake -S . -B build/x64 -A x64
 #   cmake --build build/x64 --config Release
@@ -17,13 +17,13 @@ if(POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 endif()
 
-project(foo_bpm
-        VERSION 0.4.2
-        DESCRIPTION "BPM Analyser for foobar2000"
+project(foo_rubato
+        VERSION 0.1.0
+        DESCRIPTION "Rubato BPM Analyzer for foobar2000"
         LANGUAGES C CXX)   # kiss_fft is C
 
 if(NOT WIN32)
-    message(FATAL_ERROR "foo_bpm targets the Windows build of foobar2000.")
+    message(FATAL_ERROR "foo_rubato targets the Windows build of foobar2000.")
 endif()
 
 # --- options ---------------------------------------------------------------
@@ -32,21 +32,21 @@ set(FB2K_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/foobar2000_sdk"
 set(FB2K_WTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/wtl"
     CACHE PATH "Location of the unpacked WTL")
 option(FB2K_SDK_AUTO_DOWNLOAD "Fetch the SDK and WTL if they are not present" ON)
-option(FOO_BPM_STATIC_CRT "Link the C runtime statically (no VC redist needed)" ON)
-option(FOO_BPM_LTO        "Whole program optimisation in Release builds" ON)
-set(FOO_BPM_WIN32_WINNT "0x0601" CACHE STRING "Minimum Windows version (0x0601 = Windows 7)")
+option(FOO_RUBATO_STATIC_CRT "Link the C runtime statically (no VC redist needed)" ON)
+option(FOO_RUBATO_LTO        "Whole program optimisation in Release builds" ON)
+set(FOO_RUBATO_WIN32_WINNT "0x0601" CACHE STRING "Minimum Windows version (0x0601 = Windows 7)")
 
 # --- target architecture ---------------------------------------------------
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64")
-        set(FOO_BPM_TARGET_ARCH "ARM64EC")
+        set(FOO_RUBATO_TARGET_ARCH "ARM64EC")
     else()
-        set(FOO_BPM_TARGET_ARCH "x64")
+        set(FOO_RUBATO_TARGET_ARCH "x64")
     endif()
 else()
-    set(FOO_BPM_TARGET_ARCH "x86")
+    set(FOO_RUBATO_TARGET_ARCH "x86")
 endif()
-message(STATUS "Target architecture: ${FOO_BPM_TARGET_ARCH}")
+message(STATUS "Target architecture: ${FOO_RUBATO_TARGET_ARCH}")
 
 # --- dependencies ----------------------------------------------------------
 if(NOT EXISTS "${FB2K_SDK_DIR}/foobar2000/SDK/foobar2000.h" OR
@@ -57,9 +57,9 @@ if(NOT EXISTS "${FB2K_SDK_DIR}/foobar2000/SDK/foobar2000.h" OR
             "Run scripts\\get_sdk.ps1, or configure with -DFB2K_SDK_AUTO_DOWNLOAD=ON.")
     endif()
     # PowerShell rather than file(DOWNLOAD): see the note in scripts/get_sdk.ps1.
-    find_program(FOO_BPM_POWERSHELL NAMES powershell.exe pwsh.exe REQUIRED)
+    find_program(FOO_RUBATO_POWERSHELL NAMES powershell.exe pwsh.exe REQUIRED)
     execute_process(
-        COMMAND "${FOO_BPM_POWERSHELL}" -NoProfile -ExecutionPolicy Bypass
+        COMMAND "${FOO_RUBATO_POWERSHELL}" -NoProfile -ExecutionPolicy Bypass
                 -File "${CMAKE_CURRENT_SOURCE_DIR}/scripts/get_sdk.ps1"
         RESULT_VARIABLE _sdk_result)
     if(NOT _sdk_result EQUAL 0)
@@ -73,7 +73,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-if(FOO_BPM_STATIC_CRT)
+if(FOO_RUBATO_STATIC_CRT)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
@@ -99,12 +99,12 @@ if(MSVC)
     # x64 is SSE2 by definition; on x86 it has to be asked for, and it also
     # moves double maths off the x87 stack, which keeps results consistent
     # between the two builds.
-    if(FOO_BPM_TARGET_ARCH STREQUAL "x86")
+    if(FOO_RUBATO_TARGET_ARCH STREQUAL "x86")
         add_compile_options(/arch:SSE2)
     endif()
 endif()
 
-if(FOO_BPM_LTO)
+if(FOO_RUBATO_LTO)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 endif()
@@ -113,10 +113,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/fb2k_sdk.cmake")
 
 add_subdirectory(kiss_fft)
 add_subdirectory(bpmcore)
-add_subdirectory(foo_bpm)
+add_subdirectory(foo_rubato)
 
-option(FOO_BPM_BUILD_TESTS "Build the verification harnesses" ON)
-if(FOO_BPM_BUILD_TESTS)
+option(FOO_RUBATO_BUILD_TESTS "Build the verification harnesses" ON)
+if(FOO_RUBATO_BUILD_TESTS)
     enable_testing()
     add_subdirectory(kiss_fft_test)
     add_subdirectory(bpmcore_test)

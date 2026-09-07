@@ -6,7 +6,7 @@
 #include "bpm_manual_dialog.h"
 #include "file_info_filter_scale_bpm.h"
 
-static contextmenu_group_popup_factory g_bpm_context_group(guid_bpm_context_group, contextmenu_groups::root, "BPM Analyser", 0);
+static contextmenu_group_popup_factory g_bpm_context_group(guid_bpm_context_group, contextmenu_groups::root, "Rubato BPM Analyzer", 0);
 
 
 GUID bpm_contextmenu_item::get_parent()

@@ -115,7 +115,7 @@ void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_cal
 			}
 			catch (const std::exception & exc)
 			{
-				FB2K_console_formatter() << "foo_bpm: error analysing "
+				FB2K_console_formatter() << "foo_rubato: error analysing "
 				                         << m_tracks[index]->get_path() << ": " << exc;
 			}
 			m_bpm_results.push_back(result.bpm);

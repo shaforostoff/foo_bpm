@@ -1,7 +1,7 @@
-BPM Analyser for foobar2000
-===========================
+Rubato BPM Analyzer for foobar2000
+==================================
 
-Originally written by Michael Balzer.
+Originally written by Michael Balzer as BPM Analyser.
 
 Bug fixes and refactoring by Holger Stenger.
 
@@ -26,13 +26,13 @@ Visual Studio with the C++ workload, and CMake, are the only prerequisites. The
 script fetches the foobar2000 SDK and WTL into `external\` on first run, builds
 both architectures, runs the tests and writes
 
-    dist\foo_bpm-<version>.fb2k-component
-      foo_bpm.dll        32 bit, foobar2000 1.x and 2.x (x86)
-      x64/foo_bpm.dll    64 bit, foobar2000 2.x (x64)
+    dist\foo_rubato-<version>.fb2k-component
+      foo_rubato.dll        32 bit, foobar2000 1.x and 2.x (x86)
+      x64/foo_rubato.dll    64 bit, foobar2000 2.x (x64)
 
 foobar2000 ignores subfolders it does not understand, so that single file
 installs everywhere. Symbols are packaged separately as
-`dist\foo_bpm-<version>-symbols.zip`; keep them so crash reports can be
+`dist\foo_rubato-<version>-symbols.zip`; keep them so crash reports can be
 resolved, but do not ship them.
 
 To work on it in Visual Studio, configure once and open the generated solution:
@@ -49,7 +49,7 @@ To work on it in Visual Studio, configure once and open the generated solution:
   `bpmcore/bpmcore.h`. The three stages that are worth spreading across cores -
   resampling, the envelope and the autocorrelation - all divide their work so
   that the answer does not depend on the thread count.
-* `foo_bpm/` is the foobar2000 component: decoding, tag writing, dialogs and
+* `foo_rubato/` is the foobar2000 component: decoding, tag writing, dialogs and
   preferences. It hands `bpmcore` mono PCM and gets a tempo and a rhythm back.
 * `bpmcore_test/` verifies the analysis without foobar2000 running, and can
   benchmark and profile it.
@@ -59,11 +59,33 @@ To work on it in Visual Studio, configure once and open the generated solution:
 ### Settings
 
 The preferences page is unchanged. Three entries live under **Preferences >
-Advanced > Tools > BPM Analyser**:
+Advanced > Tools > Rubato BPM Analyzer**:
 
 * *Use the legacy BPM engine* - the original 2009 algorithm. The preferences
   page's STFT and candidate-selection controls only apply to it.
 * *Write the detected rhythm to a tag* and *Rhythm tag name* - default `RHYTHM`.
+
+### Tags
+
+An automatic analysis writes the BPM to the tag named on the preferences page,
+`BPM` by default; the rhythm to `RHYTHM`, if that is switched on; and
+
+    BpmAlgorithm = Rubato;v=<version>
+
+which records what produced the number. Both the field name and the
+`<name>;v=<version>` shape follow the `KeyAlgorithm` and `TuningAlgorithm`
+fields other taggers write, so one parser reads all three. It is not
+configurable - a reader looking for an attribution has to know what it is
+called - and the version comes from `project(VERSION)` in `CMakeLists.txt`,
+which is the only place the version is written down.
+
+Only a BPM the analysis stands behind is stamped. All three ways of overruling
+it *remove* the field instead - tapping a BPM by hand in the manual dialog,
+doubling or halving one from the context menu, and doubling or halving a
+result with the results dialog's own buttons before committing. An attribution
+left over from an earlier scan would otherwise be claiming credit for a number
+the analysis did not produce. So the presence of the field is a reliable way to
+tell a measured BPM from a corrected or hand-tapped one.
 
 ### How the build hangs together
 
@@ -135,5 +157,6 @@ Links
 -----
 
 * [foobar2000 home page](http://www.foobar2000.org/)
-* [BPM Analyser](http://www.hydrogenaudio.org/forums/index.php?showtopic=77142) on the foobar2000 forum
+* [BPM Analyser](http://www.hydrogenaudio.org/forums/index.php?showtopic=77142),
+  the original component, on the foobar2000 forum
 * [KISS FFT](http://sourceforge.net/projects/kissfft/)

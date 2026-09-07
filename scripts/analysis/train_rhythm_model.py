@@ -13,7 +13,7 @@ import tango_labels as T, features as F
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 CLS = ['tango', 'vals', 'milonga', 'other']
-OUT = r'C:\Dev\foo_bpm\bpmcore\rhythm_model.h'
+OUT = config.MODEL_HEADER
 
 
 def walk(trees_flat, offsets, targets, baseline, x, n_cls):

@@ -351,7 +351,7 @@ void bpm_preferences_page::OnChanged()
 
 const char * bpm_preferences_page_impl::get_name()
 {
-	return "BPM Analyser";
+	return "Rubato BPM Analyzer";
 }
 
 GUID bpm_preferences_page_impl::get_guid()

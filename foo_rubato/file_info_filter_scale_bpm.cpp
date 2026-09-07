@@ -3,6 +3,7 @@
 #include "file_info_filter_scale_bpm.h"
 
 #include "format_bpm.h"
+#include "globals.h"
 
 file_info_filter_scale_bpm::file_info_filter_scale_bpm(const char * p_bpm_tag, double p_scale)
 	: m_bpm_tag(p_bpm_tag)
@@ -20,6 +21,10 @@ bool file_info_filter_scale_bpm::apply_filter(metadb_handle_ptr p_track, t_files
 		bpm = static_cast<float>(bpm * m_scale);
 
 		p_info.meta_set(m_bpm_tag, format_bpm(bpm));
+
+		// Doubling or halving is the user overruling the measurement, so the
+		// analysis no longer stands behind the value and its attribution goes.
+		p_info.meta_remove_field(BPM_ALGORITHM_TAG);
 
 		return true;
 	}

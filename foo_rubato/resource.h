@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by foo_bpm.rc
+// Used by foo_rubato.rc
 //
 #define IDD_BPM_PREFERENCES             101
 #define IDD_BPM_RESULT_DIALOG           103

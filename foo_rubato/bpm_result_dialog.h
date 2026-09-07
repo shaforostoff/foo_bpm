@@ -50,6 +50,9 @@ private:
 	pfc::list_t<file_info_impl> m_infos;
 	std::vector<double> m_bpm_results;
 	std::vector<pfc::string8> m_rhythms;
+	//! Rows whose BPM the user doubled or halved with the dialog's own
+	//! buttons, and which therefore no longer carry the analysis's answer.
+	std::vector<bool> m_adjusted;
 };
 
 #endif // __DPM_RESULT_DIALOG_H__

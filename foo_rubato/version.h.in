@@ -1,0 +1,23 @@
+#pragma once
+
+// Generated from version.h.in by CMake - do not edit, and do not add the
+// generated copy to git.
+//
+// The version has exactly one home: project(VERSION) in the top-level
+// CMakeLists.txt. It used to be typed out again in DECLARE_COMPONENT_VERSION,
+// and the two had already drifted by a patch level - the about box said 0.4.1
+// while the release it shipped in was 0.4.2. Three readers now share this
+// header: the about box, the BpmAlgorithm tag stamped into every analysed
+// file, and scripts\build_release.ps1, which reads the version straight out of
+// CMakeLists.txt to name the archive.
+
+#define FOO_RUBATO_NAME    "Rubato BPM Analyzer"
+#define FOO_RUBATO_VERSION "@PROJECT_VERSION@"
+
+// The value written to the BpmAlgorithm tag: which analysis produced the BPM,
+// and which version of it. Formatted like the KeyAlgorithm and TuningAlgorithm
+// fields other taggers write - "<name>;v=<version>" - so one parser reads all
+// of them, and so further semicolon-delimited parameters could be appended
+// later without breaking a reader that only wants the name.
+#define FOO_RUBATO_ALGORITHM_NAME "Rubato"
+#define FOO_RUBATO_ALGORITHM      FOO_RUBATO_ALGORITHM_NAME ";v=" FOO_RUBATO_VERSION

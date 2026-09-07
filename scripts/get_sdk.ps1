@@ -3,7 +3,7 @@
     Downloads and unpacks the build prerequisites into external\.
 
 .DESCRIPTION
-    foo_bpm builds against two things that are not in the repository:
+    foo_rubato builds against two things that are not in the repository:
 
         external\foobar2000_sdk\   foobar2000 SDK 2025-03-07
         external\wtl\              WTL 10.01

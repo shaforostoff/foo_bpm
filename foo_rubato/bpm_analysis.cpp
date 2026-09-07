@@ -52,7 +52,7 @@ namespace
 		input.open(nothing, track, input_flag_simpledecode, abort, false, false);
 		if (!input.is_open())
 		{
-			FB2K_console_formatter() << "foo_bpm: could not open " << track->get_path() << " for analysis.";
+			FB2K_console_formatter() << "foo_rubato: could not open " << track->get_path() << " for analysis.";
 			return result;
 		}
 
@@ -81,7 +81,7 @@ namespace
 			{
 				// A file whose rate changes mid-stream would put the frame grid
 				// on two different time bases; the tempo would be meaningless.
-				FB2K_console_formatter() << "foo_bpm: sample rate changes within "
+				FB2K_console_formatter() << "foo_rubato: sample rate changes within "
 				                         << track->get_path() << "; analysis stopped at the change.";
 				break;
 			}
@@ -92,7 +92,7 @@ namespace
 
 		if (collector == nullptr || collector->size() == 0)
 		{
-			FB2K_console_formatter() << "foo_bpm: no audio decoded from " << track->get_path() << ".";
+			FB2K_console_formatter() << "foo_rubato: no audio decoded from " << track->get_path() << ".";
 			return result;
 		}
 
@@ -115,14 +115,14 @@ namespace
 
 		if (!result.ok)
 		{
-			FB2K_console_formatter() << "foo_bpm: could not measure a tempo in " << track->get_path()
+			FB2K_console_formatter() << "foo_rubato: could not measure a tempo in " << track->get_path()
 			                         << " (" << pfc::format_float(result.duration, 0, 1) << "s decoded).";
 			return result;
 		}
 
 		if (bpm_config_output_debug)
 		{
-			FB2K_console_formatter() << "foo_bpm: " << pfc::string_filename_ext(track->get_path())
+			FB2K_console_formatter() << "foo_rubato: " << pfc::string_filename_ext(track->get_path())
 				<< " -> " << pfc::format_float(result.bpm, 0, 2) << " BPM, "
 				<< bpmcore::rhythm_name(result.rhythm)
 				<< " (p=" << pfc::format_float(result.confidence, 0, 2) << "), beat "

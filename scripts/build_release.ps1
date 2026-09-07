@@ -1,23 +1,23 @@
 <#
 .SYNOPSIS
-    Builds foo_bpm for every requested architecture and packages the result as
-    an installable .fb2k-component in dist\.
+    Builds foo_rubato for every requested architecture and packages the
+    result as an installable .fb2k-component in dist\.
 
 .DESCRIPTION
     Configures and builds with CMake, runs the test suite, then assembles one
     archive holding both architectures:
 
-        foo_bpm-<version>.fb2k-component
-          foo_bpm.dll        <- 32 bit, foobar2000 1.x and 2.x (x86)
-          x64/foo_bpm.dll    <- 64 bit, foobar2000 2.x (x64)
+        foo_rubato-<version>.fb2k-component
+          foo_rubato.dll        <- 32 bit, foobar2000 1.x and 2.x (x86)
+          x64/foo_rubato.dll    <- 64 bit, foobar2000 2.x (x64)
 
     foobar2000 ignores subfolders it does not understand, so one file installs
     everywhere. Debug symbols go into a separate archive that is NOT part of
     the component - keep it so foobar2000 crash reports can be resolved.
 
-    The DLL is named foo_bpm.dll on both architectures because foo_bpm.cpp
-    asserts that name with VALIDATE_COMPONENT_FILENAME; only the archive name
-    carries the version.
+    The DLL is named foo_rubato.dll on both architectures because
+    foo_rubato.cpp asserts that name with VALIDATE_COMPONENT_FILENAME; only
+    the archive name carries the version.
 
     The SDK and WTL are fetched on the first configure; see scripts\get_sdk.ps1.
 
@@ -72,7 +72,7 @@ if ($cmakeLists -notmatch '(?m)^\s*VERSION\s+([0-9]+(?:\.[0-9]+)*)') {
     throw 'Could not read VERSION out of CMakeLists.txt'
 }
 $version = $Matches[1]
-Write-Host "foo_bpm $version" -ForegroundColor Cyan
+Write-Host "foo_rubato $version" -ForegroundColor Cyan
 
 foreach ($dir in @($stage, $symbols)) {
     if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
@@ -107,7 +107,7 @@ foreach ($a in $Arch) {
     $subdir = if ($a -eq 'x64') { Join-Path $stage 'x64' } else { $stage }
     New-Item -ItemType Directory -Force $subdir | Out-Null
 
-    $built = Join-Path $buildDir "foo_bpm\$Configuration\foo_bpm.dll"
+    $built = Join-Path $buildDir "foo_rubato\$Configuration\foo_rubato.dll"
     if (-not (Test-Path $built)) { throw "Expected output missing: $built" }
     Copy-Item $built $subdir -Force
 
@@ -118,15 +118,15 @@ foreach ($a in $Arch) {
         Copy-Item $pdb $symDir -Force
     }
 
-    Write-Host ("  foo_bpm.dll  {0,-4} {1,9:N0} bytes" -f $a, (Get-Item $built).Length) -ForegroundColor Green
+    Write-Host ("  foo_rubato.dll  {0,-4} {1,9:N0} bytes" -f $a, (Get-Item $built).Length) -ForegroundColor Green
 }
 
 # --- package ---------------------------------------------------------------
 # cmake -E tar produces the same zip on every PowerShell version, and CMake is
 # already a hard dependency here.
 Write-Host "`n=== Package ===" -ForegroundColor Cyan
-$componentPath = Join-Path $distDir "foo_bpm-$version.fb2k-component"
-$symbolsPath   = Join-Path $distDir "foo_bpm-$version-symbols.zip"
+$componentPath = Join-Path $distDir "foo_rubato-$version.fb2k-component"
+$symbolsPath   = Join-Path $distDir "foo_rubato-$version-symbols.zip"
 foreach ($p in @($componentPath, $symbolsPath)) {
     if (Test-Path $p) { Remove-Item -Force $p }
 }
