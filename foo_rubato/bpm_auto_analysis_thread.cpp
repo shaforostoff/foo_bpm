@@ -4,7 +4,25 @@
 #include "preferences.h"
 #include "bpm_result_dialog.h"
 
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
 /***** Threading *****/
+//
+// Tracks are scanned several at a time. Decoding one track is a solid block of
+// one core and dwarfs the analysis that follows it, so reading more than one
+// track at once is the only thing that makes a library scan faster - see
+// docs/tango-analysis.md for the measurements.
+//
+// Two kinds of thread run here. Several scanning threads take tracks off a
+// shared counter; the thread threaded_process gave us does not scan at all,
+// and owns the progress dialog instead. That division is not tidiness:
+// threaded_process_status is handed to one worker thread and nothing in the
+// SDK promises it is safe from several at once, so exactly one thread ever
+// touches it.
 
 bpm_auto_analysis_thread::bpm_auto_analysis_thread(metadb_handle_list_cref p_tracks)
 {
@@ -127,52 +145,280 @@ void bpm_auto_analysis_thread::start()
 		);
 }
 
-void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_callback & p_abort)
+namespace
 {
-	m_bpm_results.resize(0);
-	m_rhythms.resize(0);
-	m_spreads.resize(0);
-	m_initial_bpms.resize(0);
+	//! Tracks scanned at once.
+	//!
+	//! Two cores short of the machine, so that starting a scan in the middle
+	//! of a set does not take the core the audio thread needs: every scanning
+	//! thread holds a decoder flat out, and foobar2000's own playback decode
+	//! and its user interface want one between them. Clamped to a single scan
+	//! where there are not the cores to give any away.
+	int scan_workers()
+	{
+		// hardware_concurrency is allowed to answer that it does not know.
+		const int cores = static_cast<int>(std::thread::hardware_concurrency());
+		if (cores <= 0) return 1;
+		return std::max(1, cores - 2);
+	}
 
-	p_status.set_progress(0, m_tracks.get_size());
+	//! What the scanning threads and the thread driving the dialog share.
+	//! Every field is read and written under `lock`.
+	struct scan_state
+	{
+		std::mutex lock;
+		std::condition_variable changed;
 
-	// For each item in the playlist selection
-	for (t_size index = 0; index < m_tracks.get_size(); index++)
-    {
-		// Skip the file if it doesn't exist
-		if (!filesystem::g_exists(m_tracks[index]->get_path(), p_abort))
+		t_size next = 0;       //!< the next track nobody has claimed
+		t_size finished = 0;   //!< tracks whose analysis has returned
+		int running = 0;       //!< scanning threads still alive
+
+		//! Per scanning thread: which track it is holding, SIZE_MAX between
+		//! tracks, and how far through that track it is.
+		std::vector<t_size> holding;
+		std::vector<double> fraction;
+	};
+
+	//! One of these per scanning thread. It publishes into scan_state rather
+	//! than touching the progress dialog.
+	class worker_progress : public bpm_analysis_progress
+	{
+	public:
+		worker_progress(scan_state & state, int slot) : m_state(state), m_slot(slot) {}
+
+		void fraction(double f) override
 		{
-			m_tracks.remove_by_idx(index);
-			m_infos.remove_by_idx(index);
-			index--;
+			// Deliberately no notify. The dialog is refreshed on a timer, and
+			// bpmcore reports progress often enough that waking the other
+			// thread every time would cost more than it tells anyone.
+			std::lock_guard<std::mutex> guard(m_state.lock);
+			m_state.fraction[m_slot] = f;
 		}
-		else
-		{
-			p_status.set_item_path(m_tracks[index]->get_location().get_path());
 
-			bpmcore::analysis result;
+	private:
+		scan_state & m_state;
+		int m_slot;
+	};
+
+	//! One scanning thread: take the next unclaimed track, analyse it, repeat
+	//! until the list runs out or the user aborts.
+	//!
+	//! Results are written at the track's own index, so they stay in the order
+	//! the user selected however the scans interleave, and no two threads ever
+	//! touch the same element.
+	//!
+	//! Nothing may escape this function. An exception leaving a std::thread
+	//! calls std::terminate, which would take foobar2000 down with it.
+	void scan_thread(scan_state & state, int slot, const metadb_handle_list & tracks,
+	                 std::vector<bpmcore::analysis> & results, std::vector<char> & missing,
+	                 int analysis_threads, abort_callback & abort)
+	{
+		// Below normal, because a core count is only half of leaving room for
+		// playback. If the machine ends up oversubscribed anyway, the scan is
+		// what should wait: playback skipping is unforgivable, and a scan
+		// finishing a few seconds later is not.
+		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+
+		worker_progress progress(state, slot);
+		const t_size total = tracks.get_count();
+
+		for (;;)
+		{
+			if (abort.is_aborting()) break;
+
+			t_size index;
+			{
+				std::lock_guard<std::mutex> guard(state.lock);
+				if (state.next >= total) break;
+				index = state.next++;
+				state.holding[slot] = index;
+				state.fraction[slot] = 0.0;
+			}
+
 			try
 			{
-				result = bpm_analyse(m_tracks[index], p_status, p_abort);
+				// A file can go missing between being selected and being
+				// reached, and then produces no row rather than an empty one.
+				if (!filesystem::g_exists(tracks[index]->get_path(), abort))
+				{
+					missing[index] = 1;
+				}
+				else
+				{
+					results[index] = bpm_analyse(tracks[index], progress, abort, analysis_threads);
+				}
 			}
 			catch (const exception_aborted &)
 			{
-				throw;
+				// Nothing is shown after an abort, so the half-finished row
+				// can stand as it is.
 			}
 			catch (const std::exception & exc)
 			{
 				FB2K_console_formatter() << "foo_rubato: error analysing "
-				                         << m_tracks[index]->get_path() << ": " << exc;
+				                         << tracks[index]->get_path() << ": " << exc;
 			}
-			m_bpm_results.push_back(result.bpm);
-			m_rhythms.push_back(result.ok ? bpmcore::rhythm_name(result.rhythm) : "");
-			m_spreads.push_back(result.ok ? result.bpm_spread : 0.0);
-			m_initial_bpms.push_back(result.ok ? result.initial_bpm : 0.0);
+			catch (...)
+			{
+				FB2K_console_formatter() << "foo_rubato: unknown error analysing "
+				                         << tracks[index]->get_path();
+			}
 
-			p_status.set_progress(index+1, m_tracks.get_size());
+			{
+				std::lock_guard<std::mutex> guard(state.lock);
+				state.holding[slot] = SIZE_MAX;
+				state.fraction[slot] = 0.0;
+				state.finished++;
+			}
+			state.changed.notify_all();
 		}
 
-		if (p_abort.is_aborting()) break;
+		{
+			std::lock_guard<std::mutex> guard(state.lock);
+			state.holding[slot] = SIZE_MAX;
+			state.running--;
+		}
+		state.changed.notify_all();
+	}
+}
+
+void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_callback & p_abort)
+{
+	const t_size total = m_tracks.get_count();
+	if (total == 0) return;
+
+	std::vector<bpmcore::analysis> results(total);
+	std::vector<char> missing(total, 0);
+
+	int workers = scan_workers();
+	if (static_cast<t_size>(workers) > total) workers = static_cast<int>(total);
+
+	// Asked to decide for itself, bpmcore spreads its spectral stage across
+	// the whole machine. With whole tracks already running side by side that
+	// would be the same cores counted twice, so each scan keeps its analysis
+	// on its own thread; the two cores held back are held back, not handed out
+	// here. A lone track has nothing to share with and gets the machine.
+	const int analysis_threads = workers > 1 ? 1 : 0;
+
+	scan_state state;
+	state.holding.assign(static_cast<std::size_t>(workers), SIZE_MAX);
+	state.fraction.assign(static_cast<std::size_t>(workers), 0.0);
+	state.running = workers;
+
+	p_status.set_progress(0, total);
+	p_status.set_progress_secondary(0, 1000);
+
+	std::vector<std::thread> pool;
+	pool.reserve(static_cast<std::size_t>(workers));
+	for (int slot = 0; slot < workers; slot++)
+	{
+		try
+		{
+			pool.push_back(std::thread([&, slot]()
+			{
+				scan_thread(state, slot, m_tracks, results, missing, analysis_threads, p_abort);
+			}));
+		}
+		catch (const std::exception & exc)
+		{
+			// The machine would not give us the thread. Carry on with the ones
+			// it did give us - and on no account let this leave the function,
+			// because a std::thread destroyed while still joinable calls
+			// std::terminate and would take foobar2000 with it.
+			FB2K_console_formatter() << "foo_rubato: could not start scanning thread "
+			                         << (slot + 1) << " of " << workers << ": " << exc;
+			std::lock_guard<std::mutex> guard(state.lock);
+			state.running -= workers - slot;
+			break;
+		}
+	}
+
+	// This thread scans nothing. It owns the dialog, which is what makes every
+	// other thread's silence about the dialog safe.
+	for (;;)
+	{
+		metadb_handle_list in_flight;
+		t_size done = 0;
+		double secondary = 0;
+		bool live = true;
+
+		{
+			std::unique_lock<std::mutex> guard(state.lock);
+			state.changed.wait_for(guard, std::chrono::milliseconds(100),
+			                       [&state]() { return state.running == 0; });
+
+			live = state.running > 0;
+			done = state.finished;
+
+			double sum = 0;
+			for (int slot = 0; slot < workers; slot++)
+			{
+				if (state.holding[slot] == SIZE_MAX) continue;
+				in_flight.add_item(m_tracks[state.holding[slot]]);
+				sum += state.fraction[slot];
+			}
+
+			// The average of the tracks in flight, which is the only reading
+			// of a single secondary bar that means anything once there is
+			// more than one track under it.
+			if (in_flight.get_count() > 0) secondary = sum / in_flight.get_count();
+		}
+
+		p_status.set_progress(done, total);
+		p_status.set_progress_secondary(static_cast<t_size>(secondary * 1000.0), 1000);
+		if (in_flight.get_count() == 1)
+		{
+			p_status.set_item_path(in_flight[0]->get_location().get_path());
+		}
+		else if (in_flight.get_count() > 1)
+		{
+			// Renders as "a.flac, b.flac and 4 more". The SDK has a helper for
+			// exactly this case, several items being worked on at once.
+			p_status.set_items(in_flight);
+		}
+
+		if (!live) break;
+	}
+
+	for (std::size_t t = 0; t < pool.size(); t++) pool[t].join();
+
+	// Not one thread could be started, so this one does the scanning after
+	// all, with the dialog left where it stands: a scan without a moving bar
+	// beats no scan.
+	if (pool.empty() && !p_abort.is_aborting())
+	{
+		{
+			std::lock_guard<std::mutex> guard(state.lock);
+			state.running = 1;
+		}
+		scan_thread(state, 0, m_tracks, results, missing, 0, p_abort);
+	}
+
+	// An abort is reported by throwing, as it was when this ran one track at a
+	// time; on_done then puts up no results window.
+	p_abort.check();
+
+	{
+		bit_array_bittable mask(total);
+		for (t_size index = 0; index < total; index++) mask.set(index, missing[index] != 0);
+		m_tracks.remove_mask(mask);
+		m_infos.remove_mask(mask);
+	}
+
+	m_bpm_results.clear();
+	m_rhythms.clear();
+	m_spreads.clear();
+	m_initial_bpms.clear();
+
+	for (t_size index = 0; index < total; index++)
+	{
+		if (missing[index] != 0) continue;
+
+		const bpmcore::analysis & result = results[index];
+		m_bpm_results.push_back(result.bpm);
+		m_rhythms.push_back(result.ok ? bpmcore::rhythm_name(result.rhythm) : "");
+		m_spreads.push_back(result.ok ? result.bpm_spread : 0.0);
+		m_initial_bpms.push_back(result.ok ? result.initial_bpm : 0.0);
 	}
 }
 

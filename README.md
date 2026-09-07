@@ -171,6 +171,47 @@ than the column says. Where the start of a track has no beat to measure - a
 rubato introduction, a spoken opening - the first windows that do have one are
 used, and if none do the column is blank.
 
+### Scanning a lot of tracks
+
+Tracks are scanned several at a time, two short of what the machine reports -
+`std::thread::hardware_concurrency() - 2`, and never fewer than one. Decoding a
+track is a solid block of one core and dwarfs the analysis that follows it: a
+138-second side is about a tenth of a second of analysis against seconds of
+decoding on a compressed format. Reading more than one track at once is the
+only thing that makes a library scan faster.
+
+Two cores are left alone because a scan is something a DJ starts in the middle
+of a set. Every scanning thread holds a decoder flat out, and foobar2000's own
+playback decode and its user interface want a core between them. The scanning
+threads also run at below-normal priority, and that is the part which actually
+protects playback: on a machine with hyperthreading `hardware_concurrency`
+counts logical processors, so subtracting two leaves two hyperthreads rather
+than two cores, and every physical core is in use either way. Priority is what
+settles who waits when they are.
+
+Each scan keeps its own analysis on its own thread, rather than spreading the
+spectral stage across the machine as `bpmcore` does when left to decide, which
+would be the same cores counted twice. A single track has nothing to share with
+and gets the machine. The answer is identical either way, and
+`bpmcore_test tempo_spread` checks that it is - bit for bit, for one thread,
+two and all of them - which is what makes the thread count safe to vary at all.
+
+Peak memory is worth knowing before scanning a whole library. Audio is buffered
+rather than streamed, because the onset envelope has to be normalised by the
+track's overall level and that is not known until the side has been read, so
+each scanning thread holds about 21MB for a track of ordinary length and up to
+79MB for one at the 15-minute cap. On sixteen logical processors that is around
+290MB for tango sides, and over a gigabyte if every slot happens to hold a very
+long file.
+
+Progress reporting stays on one thread: the one `threaded_process` started,
+which does no scanning itself. `threaded_process_status` is handed to that
+thread and nothing in the SDK promises it is safe from several at once, so it
+reads what the scanning threads publish instead. It shows the tracks in flight
+as *a.flac, b.flac and 4 more*, and puts the average of their progress on the
+second bar - the only reading of a single bar that means anything with several
+tracks under it.
+
 ### Tags
 
 An automatic analysis writes the BPM to the tag named on the preferences page,

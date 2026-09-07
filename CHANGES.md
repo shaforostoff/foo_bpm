@@ -32,6 +32,29 @@ Change Log
   analyse all of them, only the untagged ones, or none. A track whose info
   foobar2000 has not read yet is still skipped, but now says so in the console
   rather than vanishing.
+* Tracks are scanned several at a time rather than one after another - two
+  short of what the machine reports, and never fewer than one. Decoding is the
+  whole cost of a scan: a 138-second side is a tenth of a second of analysis
+  against seconds of decoding, so reading one track at a time left most of the
+  machine idle for the entire wait. Two cores are held back because a scan is
+  something a DJ starts in the middle of a set, and the scanning threads run
+  at below-normal priority as well, which is the part that actually keeps
+  playback smooth - on a machine with hyperthreading, subtracting two from the
+  logical processor count leaves two hyperthreads rather than two cores.
+* Each scan keeps its analysis on its own thread instead of spreading the
+  spectral stage across the machine, which with whole tracks already running
+  side by side would be the same cores counted twice; a lone track still gets
+  the machine. No tag can change as a result: `bpmcore_test tempo_spread`
+  checks the analysis is bit-identical for one thread, two and all of them,
+  which is what makes the thread count safe to vary.
+* The progress dialog now reports the tracks in flight - "a.flac, b.flac and 4
+  more" - with the average of their progress on the second bar. All of it is
+  written by the one thread `threaded_process` started, which no longer scans
+  anything itself: `threaded_process_status` is handed to that thread and
+  nothing in the SDK promises it is safe from several at once.
+* Results are recorded at each track's own index rather than appended, so the
+  results window stays in the order the tracks were selected however the scans
+  interleave.
 * The legacy 2009 engine is deleted, and the preferences page with it. It was
   off by default and unreachable without the advanced switch, had no test
   coverage - both harnesses link bpmcore alone and it lived in the component -
