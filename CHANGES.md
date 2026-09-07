@@ -21,6 +21,17 @@ Change Log
   is absent when no track had one. It shows the string the file carried rather
   than a reformatted number, because a whole number and a decimal mean
   different things here.
+* Every track in the selection is analysed. It used to be that one selected
+  track without a BPM tag caused every track that had one to be dropped,
+  silently, so asking for twenty tracks could return a single row - and the
+  **BPM from tag** column above could never be filled in exactly the case it
+  was added for. Analysing writes nothing to the files on its own; the results
+  window is where that is decided. The one exception is *Write tags
+  automatically*, which skips the window, so when that is on and some of the
+  selection already carry a BPM tag the component asks first, offering to
+  analyse all of them, only the untagged ones, or none. A track whose info
+  foobar2000 has not read yet is still skipped, but now says so in the console
+  rather than vanishing.
 * The legacy 2009 engine is deleted, and the preferences page with it. It was
   off by default and unreachable without the advanced switch, had no test
   coverage - both harnesses link bpmcore alone and it lived in the component -

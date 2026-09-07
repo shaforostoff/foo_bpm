@@ -137,10 +137,15 @@ this collection a whole number is a hand tap and a decimal is machine-written -
 a distinction worth more than a tidy column. The column is absent entirely when
 no track had a tag, rather than sitting there empty.
 
-Note which tracks reach the window at all. If any of the selection lacks a BPM
-tag, the already-tagged ones are dropped and only the bare tracks are scanned;
-it is when *all* of them are tagged that the component asks whether to scan them
-anyway, and that is the case this column is for.
+Every track in the selection reaches the window. It used to be that one track
+without a BPM tag caused every track that had one to be dropped, without a
+word - so a selection of twenty could come back as a single row, and this
+column was unfillable in the one case that most wanted it. Analysing writes
+nothing to the files on its own, so there is nothing there to protect. The one
+question the component asks is when *Write tags automatically* is on and some
+of the selection already carry a tag, because then the numbers go straight to
+the files and nothing is shown first: it offers to scan all of them, to scan
+only the untagged ones, or to stop.
 
 ### The tempo a track opens at
 

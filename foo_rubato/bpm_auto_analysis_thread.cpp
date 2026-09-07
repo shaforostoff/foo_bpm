@@ -14,73 +14,117 @@ bpm_auto_analysis_thread::bpm_auto_analysis_thread(metadb_handle_list_cref p_tra
 
 void bpm_auto_analysis_thread::start()
 {
-	bool bpm_missing = false;
-	bool rescan = false;
-
-	{
-		bit_array_bittable mask(m_tracks.get_size());
-
-		// For each item in the playlist selection
-		for (t_size index = 0; index < m_tracks.get_size(); index++)
-		{
-			if (m_tracks[index]->get_info(m_infos[index]))
-			{
-				// Are any of the tracks missing the BPM?
-				if (!m_infos[index].meta_exists(bpm_config_bpm_tag))
-				{
-					bpm_missing = true;
-				}
-			}
-			else
-			{
-				mask.set(index, true);
-			}
-		}
-
-		m_tracks.remove_mask(mask);
-		m_infos.remove_mask(mask);
-	}
-
-	if (bpm_missing)
+	// A track whose info foobar2000 has not read yet cannot be checked for a
+	// BPM tag and has no title to show, so it goes - but it says so. Dropping
+	// tracks the user selected without a word is how a selection of twenty
+	// comes back as one row.
 	{
 		bit_array_bittable mask(m_tracks.get_count());
 
 		// For each item in the playlist selection
-		for (t_size index = 0; index < m_tracks.get_size(); index++)
+		for (t_size index = 0; index < m_tracks.get_count(); index++)
 		{
-			// Remove any items that already have a BPM set. We only want to scan BPM-less tracks
-			mask.set(index, m_infos[index].meta_exists(bpm_config_bpm_tag));
+			const bool have_info = m_tracks[index]->get_info(m_infos[index]);
+
+			if (!have_info)
+			{
+				FB2K_console_formatter() << "foo_rubato: no info read yet for "
+				                         << m_tracks[index]->get_path()
+				                         << ", not analysing it";
+			}
+
+			mask.set(index, !have_info);
 		}
 
 		m_tracks.remove_mask(mask);
 		m_infos.remove_mask(mask);
 	}
-	else
-	{
-		int response = MessageBox(core_api::get_main_window(),
-					_T("All tracks you have selected already have BPM info. Would you like to scan them anyway?"),
-					_T("Information"),
-					MB_YESNO);
 
-		if (response == IDYES)
+	if (m_tracks.get_count() == 0) return;
+
+	// Everything selected is analysed. It used to be that one selected track
+	// without a BPM tag made every track that had one disappear, silently, so
+	// asking for twenty could return a single row; it also left the "BPM from
+	// tag" column - which is there so a measurement can be read against the
+	// tap beside it - impossible to fill in exactly that case. Analysing
+	// writes nothing to the files on its own: the results window is where that
+	// is decided.
+	//
+	// Unless the results window is skipped. With "write tags automatically" on
+	// the numbers go straight to the files, so re-analysing a track overwrites
+	// whatever its BPM tag held - a hand tap included - with nothing shown
+	// first. That is the one case worth asking about.
+	if (bpm_config_auto_write_tag)
+	{
+		t_size tagged = 0;
+
+		for (t_size index = 0; index < m_infos.get_size(); index++)
 		{
-			rescan = true;
+			if (m_infos[index].meta_exists(bpm_config_bpm_tag)) tagged++;
+		}
+
+		const t_size total = m_tracks.get_count();
+
+		if (tagged == total)
+		{
+			pfc::string_formatter message;
+			message << (total == 1 ? "The selected track already has a "
+			                       : "All of the selected tracks already have a ")
+			        << bpm_config_bpm_tag.get_ptr() << " tag, and \"write tags "
+			        << "automatically\" is on - so analysing "
+			        << (total == 1 ? "it" : "them")
+			        << " overwrites what the tag holds without showing you the "
+			        << "results first.\n\nAnalyse anyway?";
+
+			if (uMessageBox(core_api::get_main_window(), message.get_ptr(),
+			                "Rubato BPM Analyzer", MB_YESNO | MB_ICONQUESTION) != IDYES)
+			{
+				return;
+			}
+		}
+		else if (tagged > 0)
+		{
+			pfc::string_formatter message;
+			message << tagged << " of the " << total << " selected tracks already have a "
+			        << bpm_config_bpm_tag.get_ptr() << " tag, and \"write tags "
+			        << "automatically\" is on - so analysing them overwrites what "
+			        << "those tags hold without showing you the results first.\n\n"
+			        << "Yes - analyse all " << total << "\n"
+			        << "No - analyse only the " << (total - tagged) << " with no "
+			        << bpm_config_bpm_tag.get_ptr() << " tag\n"
+			        << "Cancel - analyse nothing";
+
+			const int response = uMessageBox(core_api::get_main_window(), message.get_ptr(),
+			                                 "Rubato BPM Analyzer",
+			                                 MB_YESNOCANCEL | MB_ICONQUESTION);
+
+			if (response != IDYES && response != IDNO) return;
+
+			if (response == IDNO)
+			{
+				bit_array_bittable mask(total);
+
+				for (t_size index = 0; index < total; index++)
+				{
+					mask.set(index, m_infos[index].meta_exists(bpm_config_bpm_tag));
+				}
+
+				m_tracks.remove_mask(mask);
+				m_infos.remove_mask(mask);
+			}
 		}
 	}
 
-	if (rescan || bpm_missing)
-	{
-		threaded_process::g_run_modeless( 
-			this,
-			threaded_process::flag_show_abort | 
-			threaded_process::flag_show_delayed |
-			threaded_process::flag_show_minimize |
-			threaded_process::flag_show_progress_dual |
-			threaded_process::flag_show_item,
-			core_api::get_main_window(),
-			"Analysing BPMs..."
-			);
-	}
+	threaded_process::g_run_modeless( 
+		this,
+		threaded_process::flag_show_abort | 
+		threaded_process::flag_show_delayed |
+		threaded_process::flag_show_minimize |
+		threaded_process::flag_show_progress_dual |
+		threaded_process::flag_show_item,
+		core_api::get_main_window(),
+		"Analysing BPMs..."
+		);
 }
 
 void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_callback & p_abort)
