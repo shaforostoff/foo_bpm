@@ -126,7 +126,10 @@ namespace
 				<< " -> " << pfc::format_float(result.bpm, 0, 2) << " BPM, "
 				<< bpmcore::rhythm_name(result.rhythm)
 				<< " (p=" << pfc::format_float(result.confidence, 0, 2) << "), beat "
-				<< pfc::format_float(result.beat_bpm, 0, 2) << " BPM, " << result.meter << "/4 grid; "
+				<< pfc::format_float(result.beat_bpm, 0, 2) << " BPM, " << result.meter << "/4 grid, "
+				<< "opens at " << pfc::format_float(result.initial_bpm, 0, 2)
+				<< " BPM, fluctuation +/-" << pfc::format_float(result.bpm_spread, 0, 2)
+				<< " BPM over " << result.spread_windows << " windows; "
 				<< pfc::format_float(result.duration, 0, 1) << "s of audio, "
 				<< pfc::format_float(read_seconds, 0, 2) << "s to read, "
 				<< pfc::format_float(analysis_seconds, 0, 2) << "s to analyse";

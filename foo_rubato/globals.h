@@ -13,6 +13,14 @@
 // fields other taggers write.
 #define BPM_ALGORITHM_TAG "BpmAlgorithm"
 
+// The tempo the track opens at, beside the BPM for the whole of it. Named
+// after the INITIALKEY field other taggers write; foobar2000 chooses the
+// spelling each container wants, which for INITIALKEY is upper case in a
+// Vorbis comment, lower case in an iTunes freeform atom and the standard TKEY
+// frame in ID3. Not configurable, for the same reason BPM_ALGORITHM_TAG is
+// not: a reader has to know what it is called.
+#define BPM_INITIAL_TAG "INITIALBPM"
+
 // Config variables
 // General
 extern cfg_int bpm_config_bpm_precision;

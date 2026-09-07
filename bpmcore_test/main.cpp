@@ -11,12 +11,21 @@
 //       check the resampler, and that one synthesised track analyses the same
 //       at every input rate. Needs no audio on disk.
 //
+//   tempo_spread
+//       check the local-tempo spread against click tracks whose fluctuation is
+//       known in advance - steady, a linear ramp, a wobble. Needs no audio.
+//
 //   pipeline <raw f32 mono file> <sample rate>
 //       run the whole chain and print the result, for comparison against the
 //       Python reference implementation the model was developed with.
 //
 //   bench <raw f32 mono file> <sample rate> [repeats]
 //       time the analysis.
+//
+//   trajectory <raw f32 mono file> <sample rate>
+//       print the tempo measured in each autocorrelation window, which is what
+//       the reported spread is the 10th-to-90th half-span of. A real drift
+//       walks; a track the windows cannot track scatters.
 
 #include <bpmcore/bpmcore.h>
 // The harness reaches past the public interface for the classifier check, so
@@ -71,9 +80,80 @@ namespace
 			std::fprintf(stderr, "analysis failed\n");
 			return 3;
 		}
-		// bpm rhythm confidence beat_bpm meter duration
-		std::printf("%.6f %s %.6f %.6f %d %.3f\n", a.bpm, bpmcore::rhythm_name(a.rhythm),
-		            a.confidence, a.beat_bpm, a.meter, a.duration);
+		// bpm rhythm confidence beat_bpm meter duration bpm_spread spread_windows initial_bpm
+		std::printf("%.6f %s %.6f %.6f %d %.3f %.4f %d %.6f\n", a.bpm, bpmcore::rhythm_name(a.rhythm),
+		            a.confidence, a.beat_bpm, a.meter, a.duration,
+		            a.bpm_spread, a.spread_windows, a.initial_bpm);
+		return 0;
+	}
+
+	//! The per-window tempo behind `analysis::bpm_spread`, for inspecting a
+	//! figure that looks wrong. Stages the pipeline the way run_profile does,
+	//! because the spread is measured from windows the public call discards.
+	int run_trajectory(const char * path, unsigned sample_rate)
+	{
+		std::vector<float> mono;
+		if (!read_pcm(path, mono))
+		{
+			std::fprintf(stderr, "cannot read %s\n", path);
+			return 2;
+		}
+
+		std::vector<float> converted;
+		const float * pcm = mono.data();
+		std::size_t count = mono.size();
+		unsigned rate = sample_rate;
+		if (!bpmcore::rate_matches_model(sample_rate))
+		{
+			bpmcore::resampler rs(sample_rate, bpmcore::odf_model_rate);
+			if (rs.valid())
+			{
+				rs.convert_all(mono.data(), mono.size(), converted, 0);
+				pcm = converted.data();
+				count = converted.size();
+				rate = rs.rate_out();
+			}
+		}
+
+		bpmcore::odf o;
+		if (!bpmcore::compute_odf(pcm, count, rate, o, nullptr, 0)) return 3;
+
+		std::vector<float> novelty;
+		bpmcore::mix_bands(o, novelty);
+		bpmcore::make_novelty(novelty, o.frame_rate);
+
+		std::vector<double> acf;
+		std::vector<std::vector<double> > per_window;
+		bpmcore::autocorrelate(novelty, acf, static_cast<int>(std::lround(5.0 * o.frame_rate)),
+		                       o.frame_rate, 0, &per_window);
+		if (acf.empty()) return 3;
+
+		const bpmcore::grid g = bpmcore::find_grid(acf, o.frame_rate);
+		if (g.beat_lag <= 0) return 3;
+
+		std::vector<double> features;
+		bpmcore::build_features(o, novelty, acf, g, features);
+		double confidence = 0;
+		const int rhythm = bpmcore::classify(features, &confidence);
+		const double tapped = bpmcore::tapped_bpm(acf, g.beat_lag, rhythm, g.meter, o.frame_rate);
+
+		int windows = 0;
+		std::vector<double> ratios;
+		const double rel = bpmcore::local_tempo_spread(per_window, g.beat_lag, &windows, &ratios);
+
+		std::printf("%.1fs  %s  beat %.3f  tapped %.3f  initial %.3f  spread %.4f over %d of %d windows\n",
+		            o.duration, bpmcore::rhythm_name(rhythm), bpmcore::lag_to_bpm(g.beat_lag, o.frame_rate),
+		            tapped, bpmcore::initial_tempo_ratio(ratios) * tapped,
+		            rel * tapped, windows, static_cast<int>(ratios.size()));
+		for (std::size_t w = 0; w < ratios.size(); w++)
+		{
+			const double centre = bpmcore::acf_window_seconds * 0.5
+			                    + bpmcore::acf_hop_seconds * static_cast<double>(w);
+			if (ratios[w] <= 0)
+				std::printf("  %6.1fs        -\n", centre);
+			else
+				std::printf("  %6.1fs  %8.3f\n", centre, tapped * ratios[w]);
+		}
 		return 0;
 	}
 
@@ -223,6 +303,48 @@ namespace
 		}
 	}
 
+	//! Beats laid down from a tempo curve, so a track can drift or wobble by a
+	//! known amount. `bpm_at` is asked for the tempo at a time in seconds and
+	//! the next click placed one of its periods later, which is what a player
+	//! following a tempo marking does. `synth_beats` above cannot do this: it
+	//! derives beat positions from fmod, which fixes the period for the whole
+	//! track.
+	template<typename bpm_fn>
+	void synth_beats_curve(std::vector<float> & out, unsigned rate, double seconds,
+	                       int meter, bpm_fn bpm_at)
+	{
+		const std::size_t n = static_cast<std::size_t>(seconds * rate);
+		// The same click as synth_beats, so only the beat positions differ.
+		const double partials[6] = { 80.0, 300.0, 640.0, 1000.0, 2200.0, 4000.0 };
+		const double weights[6]  = { 1.00, 0.45, 0.40, 0.30, 0.25, 0.18 };
+		const double click = 0.12;
+		out.assign(n, 0.0f);
+
+		double at = 0.0;
+		for (long index = 0; at < seconds; index++)
+		{
+			const double accent = (index % meter) == 0 ? 1.0 : 0.55;
+			const std::size_t begin = static_cast<std::size_t>(at * rate);
+			const std::size_t end =
+				std::min(n, static_cast<std::size_t>((at + click) * rate) + 1);
+			for (std::size_t i = begin; i < end; i++)
+			{
+				const double t = static_cast<double>(i) / rate;
+				const double into = t - at;
+				if (into < 0.0 || into >= click) continue;
+				const double env = 0.5 * (1.0 - std::cos(2.0 * test_pi * into / click))
+				                   * std::exp(-12.0 * into);
+				double v = 0;
+				for (int b = 0; b < 6; b++)
+					v += weights[b] * std::sin(2.0 * test_pi * partials[b] * t);
+				out[i] += static_cast<float>(0.3 * accent * env * v);
+			}
+			const double bpm = bpm_at(at);
+			if (!(bpm > 1.0)) break;
+			at += 60.0 / bpm;
+		}
+	}
+
 	void synth_sine(std::vector<float> & out, unsigned rate, double seconds, double hz)
 	{
 		const std::size_t n = static_cast<std::size_t>(seconds * rate);
@@ -258,6 +380,121 @@ namespace
 	//!
 	//! Every signal is synthesised here rather than read from disk, which is the
 	//! point: this runs in CI with no audio to hand.
+	int run_tempo_spread()
+	{
+		int failures = 0;
+		int checks = 0;
+		auto check = [&](bool ok, const char * what)
+		{
+			checks++;
+			if (!ok) { std::fprintf(stderr, "tempo_spread: %s\n", what); failures++; }
+		};
+
+		const unsigned rate = 22050;
+		const double seconds = 120.0;
+		auto measure = [&](const std::vector<float> & mono, int threads)
+		{
+			bpmcore::options opt; opt.threads = threads;
+			return bpmcore::analyse(mono.data(), mono.size(), rate, nullptr, &opt);
+		};
+
+		// A metronome does not fluctuate, and the figure has to say so rather
+		// than report the measurement's own noise: every window should find its
+		// peak at the same lag.
+		std::vector<float> steady;
+		synth_beats_curve(steady, rate, seconds, 4, [](double) { return 120.0; });
+		const bpmcore::analysis a_steady = measure(steady, 1);
+		std::printf("  steady 120        bpm %7.3f  spread %6.3f  windows %d\n",
+		            a_steady.bpm, a_steady.bpm_spread, a_steady.spread_windows);
+		check(a_steady.ok, "the steady track did not analyse");
+		check(a_steady.spread_windows >= bpmcore::spread_min_windows,
+		      "the steady track measured too few windows");
+		check(a_steady.bpm_spread < 0.30, "a metronome was reported as fluctuating");
+		// Nothing changes, so where the track starts is where it stays.
+		check(std::fabs(a_steady.initial_bpm - a_steady.bpm) < 0.30,
+		      "a metronome's opening tempo differs from its overall tempo");
+
+		// A linear ramp is the case whose answer can be worked out in advance.
+		// Only whole windows are taken, so their centres run from half a window
+		// in to half a window from the end, and the tempos measured are
+		// therefore uniform over that stretch of the ramp. The 10th-to-90th
+		// half-span of a uniform spread is 0.4 of its width.
+		const double f0 = 116.0, f1 = 124.0;
+		std::vector<float> ramp;
+		synth_beats_curve(ramp, rate, seconds, 4, [&](double t)
+		{
+			return f0 + (f1 - f0) * (t / seconds);
+		});
+		const bpmcore::analysis a_ramp = measure(ramp, 1);
+		const double edge = (f1 - f0) * (6.0 / seconds);
+		const double predicted = 0.4 * ((f1 - edge) - (f0 + edge));
+		std::printf("  ramp %.0f to %.0f     bpm %7.3f  spread %6.3f  predicted %.3f\n",
+		            f0, f1, a_ramp.bpm, a_ramp.bpm_spread, predicted);
+		check(a_ramp.ok, "the ramped track did not analyse");
+		check(std::fabs(a_ramp.bpm - 0.5 * (f0 + f1)) < 1.5,
+		      "the ramp's tempo did not come out near the middle of the ramp");
+		check(std::fabs(a_ramp.bpm_spread - predicted) < 0.75,
+		      "the ramp's spread is not the width the geometry predicts");
+
+		// The opening tempo is predictable for the same reason the spread is.
+		// The first three windows are centred 6, 9 and 12 seconds in, so their
+		// median is the ramp's value at 9 seconds - and it has to come out
+		// below the whole-track figure, which is the point of reporting it.
+		const double predicted_initial = f0 + (f1 - f0) * (9.0 / seconds);
+		std::printf("  ramp opening      initial %7.3f  predicted %.3f\n",
+		            a_ramp.initial_bpm, predicted_initial);
+		check(std::fabs(a_ramp.initial_bpm - predicted_initial) < 1.0,
+		      "the ramp's opening tempo is not the ramp's value there");
+		check(a_ramp.initial_bpm < a_ramp.bpm - 1.0,
+		      "a track that speeds up did not open below its overall tempo");
+
+		// A wobble the windows are long enough to see has to read well clear of
+		// the steady track. Deliberately not checked against a figure: a
+		// 48-second cycle is only four times the window, so each window
+		// averages part of it away - which is the documented limit of what this
+		// measurement can see, not a defect.
+		std::vector<float> wobble;
+		synth_beats_curve(wobble, rate, seconds, 4, [](double t)
+		{
+			return 120.0 + 3.0 * std::sin(2.0 * test_pi * t / 48.0);
+		});
+		const bpmcore::analysis a_wobble = measure(wobble, 1);
+		std::printf("  wobble 120 +/- 3  bpm %7.3f  spread %6.3f\n",
+		            a_wobble.bpm, a_wobble.bpm_spread);
+		check(a_wobble.ok, "the wobbling track did not analyse");
+		check(a_wobble.bpm_spread > a_steady.bpm_spread + 0.5,
+		      "a wobbling track did not read above a steady one");
+
+		// Too short to say anything: two windows is not a distribution.
+		std::vector<float> brief;
+		synth_beats_curve(brief, rate, 15.0, 4, [](double) { return 120.0; });
+		bpmcore::options one; one.threads = 1;
+		const bpmcore::analysis a_brief =
+			bpmcore::analyse(brief.data(), brief.size(), rate, nullptr, &one);
+		std::printf("  15s               spread %6.3f  windows %d\n",
+		            a_brief.bpm_spread, a_brief.spread_windows);
+		check(a_brief.spread_windows < bpmcore::spread_min_windows,
+		      "a 15 second track somehow measured enough windows");
+		check(a_brief.bpm_spread == 0.0,
+		      "a track too short to measure still reported a spread");
+
+		// Like everything else in the analysis, the figure cannot depend on how
+		// the work was divided: the windows land in reserved slots, and the
+		// percentiles reduce the same values in the same order.
+		const int thread_counts[] = { 2, 0 };
+		for (std::size_t i = 0; i < sizeof(thread_counts) / sizeof(thread_counts[0]); i++)
+		{
+			const bpmcore::analysis a = measure(ramp, thread_counts[i]);
+			check(a.bpm_spread == a_ramp.bpm_spread &&
+			      a.spread_windows == a_ramp.spread_windows &&
+			      a.initial_bpm == a_ramp.initial_bpm,
+			      "the spread or opening tempo changed with the thread count");
+		}
+
+		std::printf("tempo_spread: %d checks, %d failures\n", checks, failures);
+		return failures == 0 ? 0 : 1;
+	}
+
 	int run_resample()
 	{
 		int failures = 0;
@@ -426,6 +663,9 @@ int main(int argc, char ** argv)
 	const std::string mode = argc >= 2 ? argv[1] : "";
 	if (mode == "model" && argc >= 3) return run_model(argv[2]);
 	if (mode == "resample") return run_resample();
+	if (mode == "tempo_spread") return run_tempo_spread();
+	if (mode == "trajectory" && argc >= 4)
+		return run_trajectory(argv[2], static_cast<unsigned>(std::atoi(argv[3])));
 	if (mode == "pipeline" && argc >= 4)
 		return run_pipeline(argv[2], static_cast<unsigned>(std::atoi(argv[3])),
 		                    argc >= 5 ? std::atoi(argv[4]) : 1);
@@ -441,7 +681,9 @@ int main(int argc, char ** argv)
 	std::fprintf(stderr,
 		"usage: bpmcore_test model <cases file>\n"
 		"       bpmcore_test resample\n"
+		"       bpmcore_test tempo_spread\n"
 		"       bpmcore_test pipeline <raw f32 mono file> <sample rate>\n"
-		"       bpmcore_test bench <raw f32 mono file> <sample rate> [repeats]\n");
+		"       bpmcore_test bench <raw f32 mono file> <sample rate> [repeats]\n"
+		"       bpmcore_test trajectory <raw f32 mono file> <sample rate>\n");
 	return 64;
 }

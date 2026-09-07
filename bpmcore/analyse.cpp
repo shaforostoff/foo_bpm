@@ -30,9 +30,10 @@ namespace
 		make_novelty(novelty, o.frame_rate);
 
 		std::vector<double> acf;
+		std::vector<std::vector<double> > per_window;
 		autocorrelate(novelty, acf,
 		              static_cast<int>(std::lround(acf_max_lag_seconds * o.frame_rate)),
-		              o.frame_rate, threads);
+		              o.frame_rate, threads, &per_window);
 		if (acf.empty()) return result;
 
 		if (l != nullptr && l->cancelled()) return result;
@@ -51,10 +52,24 @@ namespace
 		result.bpm = tapped_bpm(acf, g.beat_lag, result.rhythm, g.meter, o.frame_rate);
 		result.ok = result.bpm > 0;
 
+		// Measured against the beat period, then expressed at whatever level the
+		// tempo is reported on: the ratio is dimensionless, so one figure serves
+		// a tango tapped on the beat and a vals tapped once a bar alike.
+		std::vector<double> ratios;
+		const double rel = local_tempo_spread(per_window, g.beat_lag,
+		                                      &result.spread_windows, &ratios);
+		result.bpm_spread = rel * result.bpm;
+		// Same windows, same level: the opening tempo rather than its spread.
+		result.initial_bpm = initial_tempo_ratio(ratios) * result.bpm;
+
 		if (l != nullptr) l->progress(1.0);
 		return result;
 	}
 }
+
+// Seven 12-second windows at a 3-second hop, so a track under about 30
+// seconds reports no spread rather than one drawn from two or three windows.
+const int spread_min_windows = 7;
 
 double max_seconds() { return buffer_max_seconds; }
 

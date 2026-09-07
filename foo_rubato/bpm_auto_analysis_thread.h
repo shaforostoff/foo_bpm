@@ -19,6 +19,13 @@ class bpm_auto_analysis_thread : public threaded_process_callback
 		pfc::list_t<file_info_impl> m_infos;
 		std::vector<double> m_bpm_results;
 		std::vector<pfc::string8> m_rhythms;
+		//! How much the tempo moves over each track, in BPM; 0 where the track
+		//! was too short to measure it. Kept as a number rather than formatted
+		//! here so that doubling or halving a result scales it too.
+		std::vector<double> m_spreads;
+		//! The tempo each track opens at, in BPM; 0 where its opening had no
+		//! beat to measure.
+		std::vector<double> m_initial_bpms;
 };
 
 #endif // __BPM_AUTO_ANALYSIS_THREAD_H__

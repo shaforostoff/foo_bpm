@@ -25,7 +25,9 @@ public:
 	END_MSG_MAP()
 
 	bpm_result_dialog(metadb_handle_list_cref p_tracks, const pfc::list_t<file_info_impl> &p_infos,
-	                  const std::vector<double> &p_bpm_results, const std::vector<pfc::string8> &p_rhythms);
+	                  const std::vector<double> &p_bpm_results, const std::vector<pfc::string8> &p_rhythms,
+	                  const std::vector<double> &p_spreads,
+	                  const std::vector<double> &p_initial_bpms);
 		
 private:
 	LRESULT OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
@@ -45,11 +47,32 @@ private:
 
 	void EnableScaleBPMButtons();
 	void ScaleSelectionBPM(double p_factor);
+	//! Widths for every column but the title, from the widest text in each.
+	void SizeColumnsToContents();
+
+	//! Column indices. Not constants: the tag column is only there when at
+	//! least one of the tracks arrived with a BPM tag on it, and everything to
+	//! its right shifts when it is.
+	int m_col_bpm = 1;
+	int m_col_tag_bpm = -1;   //!< -1 when no track had a BPM tag
+	int m_col_initial = 2;
+	int m_col_spread = 3;
+	int m_col_rhythm = 4;
 
 	metadb_handle_list m_tracks;
 	pfc::list_t<file_info_impl> m_infos;
 	std::vector<double> m_bpm_results;
 	std::vector<pfc::string8> m_rhythms;
+	//! Tempo fluctuation per track, in BPM at the level shown in the BPM
+	//! column - so halving a BPM halves this with it.
+	std::vector<double> m_spreads;
+	//! The tempo each track opens at, at that same level and scaled with it.
+	std::vector<double> m_initial_bpms;
+	//! Whatever the BPM tag held before the scan, per track, taken in the
+	//! constructor because ScaleSelectionBPM writes over m_infos later. On this
+	//! collection those are hand-tapped values, which is the whole reason for
+	//! showing them: the measurement can be read against the tap.
+	std::vector<pfc::string8> m_tag_bpms;
 	//! Rows whose BPM the user doubled or halved with the dialog's own
 	//! buttons, and which therefore no longer carry the analysis's answer.
 	std::vector<bool> m_adjusted;

@@ -63,12 +63,96 @@ Advanced > Tools > Rubato BPM Analyzer**:
 
 * *Use the legacy BPM engine* - the original 2009 algorithm. The preferences
   page's STFT and candidate-selection controls only apply to it.
-* *Write the detected rhythm to a tag* and *Rhythm tag name* - default `RHYTHM`.
+* *Write the detected rhythm to a tag* and *Rhythm tag name* - **both do
+  nothing at present.** Writing the rhythm to a tag is commented out in
+  `rhythm_tag_or_empty` in `foo_rubato/bpm_result_dialog.cpp`; restoring the two
+  lines there gives these entries their effect back. The detected rhythm is
+  still shown in the results window either way.
+
+### Tempo fluctuation
+
+The results window carries a **Fluctuation** column: how far the tempo moves
+over the track, as a plus-or-minus in BPM at the level the BPM column shows.
+
+The autocorrelation already runs over 12-second windows on a 3-second hop and
+reduces them with a median, so the tempo of each window is there to be read
+rather than needing a second pass; each window is asked for its own beat period
+near the settled one, and the figure is half the span between the 10th and 90th
+percentile of those. So the middle 80% of the track sits within the quoted
+figure of the middle, and one badly tracked window or a beatless introduction
+cannot set it. It costs nothing measurable - a 138-second track is still 0.03s
+of analysis.
+
+A window whose autocorrelation is still climbing where the search stops is
+discarded rather than counted at the edge, which is what separates a tempo that
+moves from a track the windows could not follow. Below seven usable windows -
+about half a minute of audio - the column is left blank instead of drawn from
+two or three.
+
+What the numbers look like, on 3,664 hand-tapped tracks' worth of collection:
+
+| | fluctuation |
+|---|---|
+| synthetic metronome | 0.07 |
+| milonga, vals - the steady rhythms | 0.8 - 2.0 |
+| most tango sides | 1.3 - 3.5 |
+| Pugliese, Fresedo - the rubato orchestras | 3.9 - 6.5 |
+
+A real performance never reads zero: a metronome does, but human playing has a
+BPM or so of genuine give in it before any measurement error. Two limits are
+worth knowing. It is a floor on the real variation, not a full account of it -
+a wobble that finishes well inside 12 seconds is averaged away rather than
+seen. And it cannot tell a performance that speeds up from a transfer running
+fast, because both move the beat period the same way; `bpmcore_test
+trajectory` prints the per-window tempo, where a drifting transfer walks in one
+direction and a performance breathes.
+
+### Comparing against what was already there
+
+When at least one of the scanned tracks arrives with a BPM tag already on it,
+the results window grows a **BPM from tag** column showing what the file said,
+next to the BPM just measured. On this collection those existing values are
+hand taps, so the column is the measurement set against the tap it should be
+judged by.
+
+It is shown exactly as the file carried it, decimal point included, because on
+this collection a whole number is a hand tap and a decimal is machine-written -
+a distinction worth more than a tidy column. The column is absent entirely when
+no track had a tag, rather than sitting there empty.
+
+Note which tracks reach the window at all. If any of the selection lacks a BPM
+tag, the already-tagged ones are dropped and only the bare tracks are scanned;
+it is when *all* of them are tagged that the component asks whether to scan them
+anyway, and that is the case this column is for.
+
+### The tempo a track opens at
+
+The **Initial BPM** column, and the `INITIALBPM` tag, are the tempo at the
+start rather than over the whole side - the median of the first three
+autocorrelation windows, which overlap to cover about the first 18 seconds,
+roughly a tango's introduction. Quoted at the same metrical level as the BPM
+beside it, and scaled with it when a result is doubled or halved.
+
+It is a different question from the BPM, and on this repertoire it has a
+different answer often enough to be worth a column. Sampling the collection,
+the classic orchestras open faster than they settle - a median of +1.8 BPM on
+shellac and +2.0 on vinyl, higher in eight sides of twelve either way, which is
+the orchestra easing off as the singer comes in. The Orquesta Tipica Victor
+sides run the other way, which is what a dance orchestra cut to a strict tempo
+should do.
+
+The figure is conservative on a side that moves. Fitting a peak in a window
+whose tempo is changing pulls the estimate toward the tempo of the whole track:
+on a synthesised ramp from 116 to 124 BPM the opening reads 117.4 where the
+ramp is at 116.6, so a real opening is a little further from the overall figure
+than the column says. Where the start of a track has no beat to measure - a
+rubato introduction, a spoken opening - the first windows that do have one are
+used, and if none do the column is blank.
 
 ### Tags
 
 An automatic analysis writes the BPM to the tag named on the preferences page,
-`BPM` by default; the rhythm to `RHYTHM`, if that is switched on; and
+`BPM` by default; the tempo the track opens at to `INITIALBPM`; and
 
     BpmAlgorithm = Rubato;v=<version>
 
@@ -86,6 +170,15 @@ result with the results dialog's own buttons before committing. An attribution
 left over from an earlier scan would otherwise be claiming credit for a number
 the analysis did not produce. So the presence of the field is a reliable way to
 tell a measured BPM from a corrected or hand-tapped one.
+
+`INITIALBPM` follows the BPM rather than the attribution, because it is a
+measurement and not a claim about who made it: doubling or halving scales it,
+since a BPM read at the wrong metrical level had its opening read at the wrong
+level too and one factor puts both right. A hand-tapped BPM removes it, there
+being no opening tempo in a tap. Like `BpmAlgorithm` the name is fixed rather
+than configurable, and foobar2000 picks the spelling each container wants -
+`INITIALKEY`, the field it is named after, is upper case in a Vorbis comment,
+lower case in an iTunes freeform atom and the standard `TKEY` frame in ID3.
 
 ### How the build hangs together
 

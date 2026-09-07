@@ -48,7 +48,45 @@ struct analysis
 	double beat_bpm = 0;     //!< the underlying beat, before the level is chosen
 	int meter = 0;           //!< beats per bar the grid settled on
 	double duration = 0;     //!< seconds of audio analysed
+
+	//! How much the tempo moves over the track, in BPM at the same metrical
+	//! level as `bpm`: half the span between the 10th and 90th percentile of
+	//! the tempo measured in each 12-second window. So the middle 80% of the
+	//! track sits within +/- this of the middle, and a steady digital
+	//! recording reads near zero while a shellac side with a wandering
+	//! turntable, or an orquesta playing hard rubato, does not.
+	//!
+	//! Percentiles rather than a standard deviation because a beatless
+	//! introduction or one badly tracked window should not set the figure.
+	//! It is a floor on the real variation, not an exact account of it: each
+	//! window carries its own measurement error, and a wobble finishing well
+	//! inside 12 seconds is averaged away rather than seen.
+	double bpm_spread = 0;
+	//! Windows the spread was measured over. Below `spread_min_windows` it is
+	//! left at zero, there being too little of the track to say anything.
+	int spread_windows = 0;
+
+	//! The tempo the track starts at, in BPM at the same metrical level as
+	//! `bpm`; 0 where the opening had no beat to measure.
+	//!
+	//! Not the same question as `bpm`, which is the median over the whole
+	//! side. A tango often opens faster than it settles - the orchestra eases
+	//! off when the singer enters - so this is what a DJ needs to know to
+	//! follow one track with another, and the two figures differ by more than
+	//! rounding on any side worth the distinction.
+	//!
+	//! The median of the first few autocorrelation windows rather than the
+	//! very first: one window is 12 seconds and carries its own error, and the
+	//! first three overlap so heavily that they still describe only the
+	//! opening. Where the opening is beatless the first windows that do have a
+	//! beat are used, so on a track with a long rubato introduction this is the
+	//! first tempo there was one to measure.
+	double initial_bpm = 0;
 };
+
+//! Windows a track needs before `bpm_spread` is reported at all. At a
+//! 3-second hop this is a little over 20 seconds of audio.
+extern const int spread_min_windows;
 
 //! Optional host hook. Analysis stops early and returns `ok == false` when
 //! `cancelled` goes true.

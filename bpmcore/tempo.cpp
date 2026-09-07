@@ -11,8 +11,6 @@ namespace
 {
 	// Twelve seconds is around six bars of tango: long enough to resolve the
 	// bar, short enough that the tempo inside one window is effectively steady.
-	const double acf_window_seconds = 12.0;
-	const double acf_hop_seconds    =  3.0;
 
 	const double novelty_local_mean_seconds = 0.6;
 
@@ -99,9 +97,29 @@ namespace
 		return std::sqrt(var / x.size());
 	}
 
-	//! Parabolic refinement of the autocorrelation peak nearest `lag`.
-	double refine_peak(const std::vector<double> & r, double lag, double tol, double * peak_out)
+	//! Linear-interpolated percentile of an already sorted sample.
+	double percentile_sorted(const std::vector<double> & v, double q)
 	{
+		if (v.empty()) return 0.0;
+		if (v.size() == 1) return v[0];
+		const double pos = q * (v.size() - 1);
+		const std::size_t i = static_cast<std::size_t>(pos);
+		if (i + 1 >= v.size()) return v.back();
+		const double f = pos - i;
+		return v[i] + f * (v[i + 1] - v[i]);
+	}
+
+	//! Parabolic refinement of the autocorrelation peak nearest `lag`.
+	//!
+	//! `interior_out`, when given, reports whether the best lag was strictly
+	//! inside the search range. It is false when the autocorrelation only falls
+	//! across the range, so the answer is the edge it was stopped at rather
+	//! than a peak - which a caller measuring where the peak actually is has to
+	//! reject, and a caller only sharpening an estimate can ignore.
+	double refine_peak(const std::vector<double> & r, double lag, double tol, double * peak_out,
+	                   bool * interior_out = nullptr)
+	{
+		if (interior_out) *interior_out = false;
 		const int n = static_cast<int>(r.size());
 		const int lo = std::max(1, static_cast<int>(std::floor(lag * (1.0 - tol))));
 		const int hi = std::min(n - 2, static_cast<int>(std::ceil(lag * (1.0 + tol))));
@@ -112,6 +130,7 @@ namespace
 		}
 		int j = lo;
 		for (int i = lo; i <= hi; i++) if (r[i] > r[j]) j = i;
+		if (interior_out) *interior_out = (j > lo && j < hi);
 
 		if (j >= 1 && j < n - 1)
 		{
@@ -142,6 +161,9 @@ const char * rhythm_name(int cls)
 		default:             return "Other";
 	}
 }
+
+const double acf_window_seconds = 12.0;
+const double acf_hop_seconds    =  3.0;
 
 double lag_to_bpm(double lag, double frame_rate) { return lag > 0 ? 60.0 * frame_rate / lag : 0.0; }
 double bpm_to_lag(double bpm, double frame_rate) { return bpm > 0 ? 60.0 * frame_rate / bpm : 0.0; }
@@ -208,9 +230,11 @@ void make_novelty(std::vector<float> & x, double frame_rate)
 }
 
 void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
-                   int max_lag, double frame_rate, int threads)
+                   int max_lag, double frame_rate, int threads,
+                   std::vector<std::vector<double> > * per_window_out)
 {
 	acf.clear();
+	if (per_window_out != nullptr) per_window_out->clear();
 	const int n = static_cast<int>(y.size());
 	if (n < 16 || max_lag < 8) return;
 
@@ -276,6 +300,9 @@ void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
 		if (!slots[w].empty()) per_window.push_back(std::move(slots[w]));
 
 	if (per_window.empty()) return;
+
+	// Copied rather than moved: the median below reads them all.
+	if (per_window_out != nullptr) *per_window_out = per_window;
 
 	acf.assign(L, 0.0);
 	std::vector<double> column(per_window.size());
@@ -375,6 +402,72 @@ double refine_period(const std::vector<double> & r, double lag0)
 		}
 	}
 	return best_lag;
+}
+
+double local_tempo_spread(const std::vector<std::vector<double> > & per_window,
+                          double beat_lag, int * windows_out,
+                          std::vector<double> * ratios_out)
+{
+	if (windows_out != nullptr) *windows_out = 0;
+	if (ratios_out != nullptr) ratios_out->assign(per_window.size(), 0.0);
+	if (beat_lag <= 0) return 0.0;
+
+	// Wide enough for the drift and rubato a performance actually has, which is
+	// a few percent, and narrow enough that the only peak in range is the beat
+	// itself. It was 15% at first, and that was too generous: within 15% of the
+	// beat there are competing periodicities a sung passage can prefer, and a
+	// window that latched onto one read as a tempo change that was not there.
+	const double search_tol = 0.08;
+	// A window whose peak is this weak has no beat to time: a beatless
+	// introduction, applause, a run of surface noise.
+	const double min_peak = 0.05;
+
+	std::vector<double> ratio;
+	ratio.reserve(per_window.size());
+	for (std::size_t w = 0; w < per_window.size(); w++)
+	{
+		const std::vector<double> & r = per_window[w];
+		if (static_cast<int>(r.size()) < 8) continue;
+		double peak = 0;
+		bool interior = false;
+		const double lag = refine_peak(r, beat_lag, search_tol, &peak, &interior);
+		// A peak on the edge of the range is not a peak: the autocorrelation was
+		// still climbing when the search stopped, so this window's tempo is
+		// somewhere outside the range and all that can honestly be said is that
+		// the window did not measure it. Counting the edge instead would pile
+		// windows onto the boundary and report the width of the search as if it
+		// were the width of the fluctuation.
+		if (lag <= 0 || !interior || peak < min_peak) continue;
+		// Tempo goes as the reciprocal of the period, so this ratio is the
+		// window's tempo as a multiple of the settled one, at any level.
+		ratio.push_back(beat_lag / lag);
+		if (ratios_out != nullptr) (*ratios_out)[w] = beat_lag / lag;
+	}
+
+	if (windows_out != nullptr) *windows_out = static_cast<int>(ratio.size());
+	if (static_cast<int>(ratio.size()) < spread_min_windows) return 0.0;
+
+	std::sort(ratio.begin(), ratio.end());
+	const double lo = percentile_sorted(ratio, 0.10);
+	const double hi = percentile_sorted(ratio, 0.90);
+	return std::max(0.0, 0.5 * (hi - lo));
+}
+
+double initial_tempo_ratio(const std::vector<double> & ratios)
+{
+	// Three windows on a 3-second hop span the first 18 seconds, which is
+	// about the length of a tango's introduction. Fewer is noisier and more
+	// stops describing the opening and starts describing the side.
+	const std::size_t want = 3;
+
+	std::vector<double> first;
+	first.reserve(want);
+	for (std::size_t w = 0; w < ratios.size() && first.size() < want; w++)
+		if (ratios[w] > 0) first.push_back(ratios[w]);
+
+	if (first.empty()) return 0.0;
+	std::sort(first.begin(), first.end());
+	return first[first.size() / 2];
 }
 
 double tapped_bpm(const std::vector<double> & r, double beat_lag, int rhythm,

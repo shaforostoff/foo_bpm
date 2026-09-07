@@ -10,12 +10,14 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
                                            const std::vector<double> & p_bpm_results,
                                            const char * p_rhythm_tag,
                                            const std::vector<pfc::string8> & p_rhythms,
-                                           const std::vector<bool> & p_adjusted)
+                                           const std::vector<bool> & p_adjusted,
+                                           const std::vector<double> & p_initial_bpms)
 	: m_bpm_tag(p_bpm_tag), m_rhythm_tag(p_rhythm_tag != nullptr ? p_rhythm_tag : "")
 	, m_from_analysis(true)
 {
 	const bool have_rhythms = p_rhythms.size() == p_bpm_results.size() && !m_rhythm_tag.is_empty();
 	const bool have_adjusted = p_adjusted.size() == p_bpm_results.size();
+	const bool have_initial = p_initial_bpms.size() == p_bpm_results.size();
 	pfc::dynamic_assert(p_tracks.get_count() == p_bpm_results.size());
 	pfc::array_t<t_size> order;
 	order.set_size(p_tracks.get_count());
@@ -25,6 +27,7 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
 	m_bpm_results.resize(order.get_size());
 	if (have_rhythms) m_rhythms.resize(order.get_size());
 	if (have_adjusted) m_adjusted.resize(order.get_size());
+	if (have_initial) m_initial_bpms.resize(order.get_size());
 
 	// The tracks are sorted so apply_filter can bsearch them; every parallel
 	// array has to follow the same permutation.
@@ -34,6 +37,7 @@ file_info_filter_bpm::file_info_filter_bpm(const metadb_handle_list & p_tracks, 
 		m_bpm_results[n] = p_bpm_results[order[n]];
 		if (have_rhythms) m_rhythms[n] = p_rhythms[order[n]];
 		if (have_adjusted) m_adjusted[n] = p_adjusted[order[n]];
+		if (have_initial) m_initial_bpms[n] = p_initial_bpms[order[n]];
 	}
 }
 
@@ -66,6 +70,20 @@ bool file_info_filter_bpm::apply_filter(metadb_handle_ptr p_track, t_filestats p
 		else
 		{
 			p_info.meta_remove_field(BPM_ALGORITHM_TAG);
+		}
+
+		// The tempo the track opens at, which on a side that eases off for the
+		// singer is several BPM above the figure for the whole of it. Removed
+		// rather than left behind when there is none to write, so it can never
+		// describe a different measurement from the BPM beside it.
+		const double initial = index < m_initial_bpms.size() ? m_initial_bpms[index] : 0.0;
+		if (m_from_analysis && initial > 0)
+		{
+			p_info.meta_set(BPM_INITIAL_TAG, format_bpm(initial));
+		}
+		else
+		{
+			p_info.meta_remove_field(BPM_INITIAL_TAG);
 		}
 
 		if (index < m_rhythms.size() && !m_rhythm_tag.is_empty() && !m_rhythms[index].is_empty())

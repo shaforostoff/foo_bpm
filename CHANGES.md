@@ -15,6 +15,55 @@ Change Log
   separate context menus and separate settings, and can be run side by side to
   compare them. Point them at different BPM tag names before doing that, or
   they will overwrite each other's answers.
+* The results window shows a **BPM from tag** column when at least one of the
+  scanned tracks already carried a BPM tag, so a fresh measurement can be read
+  against the value that was there - a hand tap, on this collection. The column
+  is absent when no track had one. It shows the string the file carried rather
+  than a reformatted number, because a whole number and a decimal mean
+  different things here.
+* The rhythm is no longer written to a tag. The code is commented out rather
+  than removed, in `rhythm_tag_or_empty`, and the rhythm is still detected and
+  still shown in the results window. The two advanced-config entries that used
+  to control it are still present and now have no effect.
+* The tempo a track opens at is measured, shown in the results window as
+  *Initial BPM* and written to an `INITIALBPM` tag, named after the
+  `INITIALKEY` other taggers write. It is the median of the first three
+  autocorrelation windows - about the first 18 seconds, or a tango's
+  introduction - quoted at the same metrical level as the BPM and scaled with
+  it when a result is doubled or halved. On this repertoire it is a genuinely
+  different number: the classic orchestras open a median 1.8 BPM above where
+  they settle on shellac and 2.0 on vinyl, higher in eight sides of twelve
+  either way, while the strict-tempo Orquesta Tipica Victor sides run the other
+  way. On a synthesised ramp from 116 to 124 BPM it reads 117.4 where the ramp
+  is at 116.6, so the figure leans toward the whole-track tempo and understates
+  a real opening slightly - fitting a peak in a window whose tempo is moving
+  does that, and the `tempo_spread` case pins the size of it.
+* The results window shows how much the tempo moves over each track, as a
+  plus-or-minus in BPM beside the BPM itself. The autocorrelation was already
+  measuring the tempo of every 12-second window and throwing all but the median
+  away; the figure is half the 10th-to-90th percentile span of those, so the
+  middle 80% of a track sits inside it and a beatless introduction cannot set
+  it. A synthesised metronome reads 0.07 and a linear ramp from 116 to 124 BPM
+  reads 2.91 against the 2.88 the window geometry predicts, which is what the
+  new `tempo_spread` test case checks. On the collection, milonga and vals read
+  0.8 to 2.0, most tango sides 1.3 to 3.5, and Pugliese and Fresedo 3.9 to 6.5
+  - which is the order a dancer would put them in. It costs nothing measurable.
+* Windows the analysis could not track are dropped rather than counted at the
+  edge of the search. The first attempt searched 15% either side of the settled
+  beat and took whatever was best, which on a weak passage was whichever end
+  the search stopped at; one Fresedo side came out at +/-14 BPM, an 11% swing,
+  entirely from windows piled on the boundary. The search is 8% either side
+  now - wider than any real drift, narrow enough to hold no competing
+  periodicity - and a window whose autocorrelation is still climbing where the
+  search ends is discarded. That side now reads 4.98 over the 27 windows that
+  did track, which its trajectory bears out: about 133 BPM through the
+  instrumental opening and 125 once the singer enters.
+* `bpmcore_test trajectory` prints the tempo of each window, for asking why a
+  particular track reads the way it does.
+* Every column in the results window except the title is now sized to the
+  widest string in it, header included, and the title takes what is left. The
+  widths were hardcoded, and at 270 plus 50 plus 70 dialog units they already
+  overflowed the 381-unit list slightly before a fourth column existed.
 * An analysis now records itself in a `BpmAlgorithm` tag, written alongside
   the BPM as `Rubato;v=<version>` - the same field name shape and the same
   `<name>;v=<version>` value as the `KeyAlgorithm` and `TuningAlgorithm`

@@ -87,6 +87,8 @@ void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_cal
 {
 	m_bpm_results.resize(0);
 	m_rhythms.resize(0);
+	m_spreads.resize(0);
+	m_initial_bpms.resize(0);
 
 	p_status.set_progress(0, m_tracks.get_size());
 
@@ -120,6 +122,8 @@ void bpm_auto_analysis_thread::run(threaded_process_status & p_status, abort_cal
 			}
 			m_bpm_results.push_back(result.bpm);
 			m_rhythms.push_back(result.ok ? bpmcore::rhythm_name(result.rhythm) : "");
+			m_spreads.push_back(result.ok ? result.bpm_spread : 0.0);
+			m_initial_bpms.push_back(result.ok ? result.initial_bpm : 0.0);
 
 			p_status.set_progress(index+1, m_tracks.get_size());
 		}
@@ -133,7 +137,9 @@ void bpm_auto_analysis_thread::on_done(ctx_t p_wnd, bool p_was_aborted)
 
 	if (!p_was_aborted && core_api::assert_main_thread())
 	{
-		bpm_result_dialog* m_result_dialog = new bpm_result_dialog(m_tracks, m_infos, m_bpm_results, m_rhythms);
+		bpm_result_dialog* m_result_dialog =
+			new bpm_result_dialog(m_tracks, m_infos, m_bpm_results, m_rhythms, m_spreads,
+			                      m_initial_bpms);
 
 		m_result_dialog->Create(core_api::get_main_window(), NULL);
 		if (m_result_dialog->IsWindow())

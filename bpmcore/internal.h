@@ -126,8 +126,41 @@ void make_novelty(std::vector<float> & x, double frame_rate);
 //! The median across windows is what lets a passage that drops tempo for a few
 //! bars - a bandoneon variation, a singer's rubato - pass without dragging the
 //! answer down, which is what the hand tapping did too.
+//!
+//! `per_window`, when given, receives the windows the median was taken over,
+//! in time order. That is what `local_tempo_spread` reads: the windows are
+//! already computed, so measuring how far the tempo moves across them costs
+//! nothing beyond keeping them.
 void autocorrelate(const std::vector<float> & y, std::vector<double> & acf,
-                   int max_lag, double frame_rate, int threads = 0);
+                   int max_lag, double frame_rate, int threads = 0,
+                   std::vector<std::vector<double> > * per_window = nullptr);
+
+//! Geometry of the autocorrelation windows the spread is measured over.
+extern const double acf_window_seconds;   //!< 12s, about 25 beats of a tango
+extern const double acf_hop_seconds;      //!<  3s
+
+//! Spread of the per-window tempo about its middle, as a fraction of the beat
+//! period - multiply by a BPM to express it at that metrical level.
+//!
+//! Each window is asked for its own beat period near the settled one, so the
+//! windows are all measuring the same metrical level and none of them can
+//! wander off onto a harmonic. `windows_out` receives how many were usable.
+//! Returns 0 when too few were.
+//!
+//! `ratios_out`, when given, receives one entry per window in time order - the
+//! window's tempo as a multiple of the settled one, or 0 where the window had
+//! no beat worth timing. That is what tells a real drift from a track the
+//! windows simply could not track: the first is monotone, the second scatters.
+double local_tempo_spread(const std::vector<std::vector<double> > & per_window,
+                          double beat_lag, int * windows_out,
+                          std::vector<double> * ratios_out = nullptr);
+
+//! The tempo at the start of the track, as a fraction of the beat period -
+//! multiply by a BPM as with `local_tempo_spread`. Takes the per-window ratios
+//! that function emits, so both read one measurement of the windows.
+//!
+//! Returns 0 when no window near the start had a beat in it.
+double initial_tempo_ratio(const std::vector<double> & ratios);
 //! Joint search over beat period and meter.
 grid find_grid(const std::vector<double> & acf, double frame_rate);
 //! Sharpen a beat period against every harmonic of itself at once.

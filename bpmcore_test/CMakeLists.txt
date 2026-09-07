@@ -21,4 +21,10 @@ add_test(NAME rhythm_model
 # nothing on disk.
 add_test(NAME resample COMMAND bpmcore_test resample)
 
+# Checks the local-tempo spread against click tracks whose fluctuation is known
+# in advance: steady reads near zero, a linear ramp reads the width the window
+# geometry predicts, and a wobble reads clear of steady. Synthesises its own
+# audio too.
+add_test(NAME tempo_spread COMMAND bpmcore_test tempo_spread)
+
 set_target_properties(bpmcore_test PROPERTIES FOLDER "Tests")

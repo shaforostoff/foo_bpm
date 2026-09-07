@@ -26,6 +26,18 @@ bool file_info_filter_scale_bpm::apply_filter(metadb_handle_ptr p_track, t_files
 		// analysis no longer stands behind the value and its attribution goes.
 		p_info.meta_remove_field(BPM_ALGORITHM_TAG);
 
+		// The opening tempo is quoted at the same metrical level as the BPM, so
+		// it is scaled rather than dropped: halving the BPM because the
+		// analysis picked the wrong level means the opening was on the wrong
+		// level too, and the same factor puts both right.
+		const char * initial_str = p_info.meta_get(BPM_INITIAL_TAG, 0);
+		float initial = 0.0f;
+		if ((initial_str != NULL) && (sscanf_s(initial_str, "%f", &initial) == 1) && initial > 0)
+		{
+			p_info.meta_set(BPM_INITIAL_TAG,
+			                format_bpm(static_cast<double>(initial) * m_scale));
+		}
+
 		return true;
 	}
 	else
