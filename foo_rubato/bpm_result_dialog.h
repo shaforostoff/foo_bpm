@@ -49,6 +49,8 @@ private:
 	void ScaleSelectionBPM(double p_factor);
 	//! Widths for every column but the title, from the widest text in each.
 	void SizeColumnsToContents();
+	//! "Update 137 files" on the commit button, and the width to draw it in.
+	void LabelUpdateButton();
 
 	//! Column indices. Not constants: the tag column is only there when at
 	//! least one of the tracks arrived with a BPM tag on it, and everything to

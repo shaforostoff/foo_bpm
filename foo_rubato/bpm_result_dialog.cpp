@@ -174,6 +174,7 @@ LRESULT bpm_result_dialog::OnInitDialog(CWindow wndFocus, LPARAM lInitParam)
 		uSetDlgItemText(m_hWnd, ID_RESULT_BPM_TAG, bpm_tag_label);
 
 		EnableScaleBPMButtons();
+		LabelUpdateButton();
 	}
 
 	return 0;
@@ -348,4 +349,75 @@ void bpm_result_dialog::SizeColumnsToContents()
 	const int title_min = 80;
 	const int left = client.Width() - used - scrollbar;
 	result_list.SetColumnWidth(0, std::max(title_min, left));
+}
+
+//! How many files the button is about to write, said on the button. It writes
+//! every track in the list and always has - the selection drives the double and
+//! halve buttons only - so the count is the whole list, and saying it is the
+//! answer to what the selection has to do with it.
+//!
+//! Sized to the label as well, because the count is generated: "Update 99 files"
+//! already needs more than the 50 units the fixed label sat in. 74 units holds
+//! five digits with room to spare - scripts\render_dialogs.ps1 was pointed at a
+//! template saying "Update 99999 files" to see that - so the growth here is not
+//! for the count. It is for a host drawing the page in a face wider than the
+//! template's own, which is the one thing that can make a fitted label overflow
+//! and which nothing in the build can check. It grows from the right edge, so
+//! the button keeps its place beside Cancel, and stops at the hint to its left.
+void bpm_result_dialog::LabelUpdateButton()
+{
+	CWindow button = GetDlgItem(IDOK);
+	if (button == NULL) return;
+
+	const t_size count = m_tracks.get_count();
+	pfc::string_formatter drawn;
+	if (count == 1) drawn << "Update file";
+	else drawn << "Update " << count << " files";
+
+	// The accelerator prefix goes on after the measurement: it selects the
+	// mnemonic rather than being drawn, so measuring it would ask for a
+	// character's worth of width the label never uses.
+	pfc::string_formatter label;
+	label << "&" << drawn;
+	uSetDlgItemText(m_hWnd, IDOK, label);
+
+	const pfc::stringcvt::string_wide_from_utf8 wide(drawn);
+	CWindowDC dc(button);
+	CSize text;
+	HFONT font = button.GetFont();
+	HFONT previous = (font != NULL) ? dc.SelectFont(font) : NULL;
+	const BOOL measured = dc.GetTextExtent(wide.get_ptr(),
+	                                       pfc::downcast_guarded<int>(wide.length()), &text);
+	if (previous != NULL) dc.SelectFont(previous);
+	if (!measured) return;
+
+	CRect rect;
+	button.GetWindowRect(&rect);
+	ScreenToClient(&rect);
+
+	// Room for the margins the button draws either side of its text, which the
+	// extent does not include - the same figure the columns above use, for the
+	// same reason.
+	const int padding = 14;
+	int target = rect.right - std::max<int>(rect.Width(), text.cx + padding);
+
+	CWindow hint = GetDlgItem(ID_RESULT_SELECT_HINT);
+	if (hint != NULL)
+	{
+		CRect hint_rect;
+		hint.GetWindowRect(&hint_rect);
+		ScreenToClient(&hint_rect);
+		// A count absurd enough to reach this would clip, but so would any
+		// other answer once the row is full.
+		const int gap = 8;
+		target = std::max<int>(target, hint_rect.right + gap);
+	}
+
+	// Only ever wider: a one file label is narrower than the template, and a
+	// button that changes size with the count draws the eye to the wrong thing.
+	if (target < rect.left)
+	{
+		button.SetWindowPos(NULL, target, rect.top, rect.right - target, rect.Height(),
+		                    SWP_NOZORDER | SWP_NOACTIVATE);
+	}
 }

@@ -125,6 +125,17 @@ fast, because both move the beat period the same way; `bpmcore_test
 trajectory` prints the per-window tempo, where a drifting transfer walks in one
 direction and a performance breathes.
 
+### Committing the results
+
+The results window writes nothing until *Update N files* is clicked, and then
+it writes every track in the list. The selection is for the double and halve
+buttons, which act on the rows highlighted; it does not narrow what gets
+written, which is why the button counts the files rather than saying *Update
+files* and leaving the question open.
+
+*Cancel* closes the window and writes nothing. *Write tags automatically*
+skips the window altogether and writes everything the scan produced.
+
 ### Comparing against what was already there
 
 When at least one of the scanned tracks arrives with a BPM tag already on it,

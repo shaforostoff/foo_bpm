@@ -27,6 +27,7 @@
 #define ID_HALVE_BPM_BUTTON             1034
 #define ID_CONFIG_WRITE_INITIAL_BPM     1035
 #define ID_CONFIG_WRITE_BPM_ALGORITHM   1036
+#define ID_RESULT_SELECT_HINT           1037
 
 // Next default values for new objects
 // 
@@ -34,7 +35,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        106
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1037
+#define _APS_NEXT_CONTROL_VALUE         1038
 #define _APS_NEXT_SYMED_VALUE           104
 #endif
 #endif

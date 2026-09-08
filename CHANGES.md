@@ -45,6 +45,15 @@ Change Log
   analyse all of them, only the untagged ones, or none. A track whose info
   foobar2000 has not read yet is still skipped, but now says so in the console
   rather than vanishing.
+* The results window's commit button says how many files it is about to write
+  - *Update 137 files*, or *Update file* for one. It writes every track in the
+  list, which the old fixed *Update files* left open to being read as the
+  selection; the selection drives the double and halve buttons only. The button
+  went from 50 dialog units to 74 to hold the count - *Update 99 files* already
+  needed more than the fixed label did - which is five digits with room to
+  spare. It measures its own label at run time too, and widens if it has to,
+  which only a host drawing the page in a wider face than the template's can
+  bring about.
 * Every checkbox on the preferences page carried `BS_CENTER`, which centres a
   label in its control rather than setting it against the box. *Write tags
   automatically* nearly fills its 93 units so it looked flush, but the two new
