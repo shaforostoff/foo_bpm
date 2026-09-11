@@ -168,7 +168,7 @@ double refine_period(const std::vector<double> & acf, double lag0);
 //! Choose the metrical level the user would have tapped, given the rhythm.
 //!
 //! `meter` is only consulted for `rhythm_other`, which has no tapping
-//! convention of its own; the three tango rhythms carry their own level set.
+//! convention of its own; the four named rhythms carry their own level set.
 double tapped_bpm(const std::vector<double> & acf, double beat_lag, int rhythm,
                   int meter, double frame_rate);
 

@@ -1,21 +1,23 @@
 Rubato BPM Analyzer for foobar2000
 ==================================
 
-Originally written by Michael Balzer as BPM Analyser.
-
-Bug fixes and refactoring by Holger Stenger.
-
-Detects the tempo of a track and which of Tango, Vals or Milonga it is - or
-none of the three - from the audio alone, without reading the genre tag.
+Detects the tempo of a track and which of Tango, Vals, Milonga it is
+- or none of the three - from the audio alone, without reading the genre tag.
 
 The two answers are linked. The tempo a dancer taps is not a property of the
 audio by itself: a tango is tapped on the beat, a vals once per 3/4 bar, a
-milonga once per 2/4 bar. So the rhythm is settled first and the tempo reported
-on the level that rhythm implies. Measured against 3,664 hand-tapped tracks the
-estimate lands within 2 BPM of the tap 89.0% of the time, which is about as
-close as the same person tapping the same track twice; rhythm classification is
-94% accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method
-and the full numbers.
+milonga once per 2/4 bar, a reggae on the quarter note - under the skank rather
+than on it. So the rhythm is settled first and the tempo reported on the level
+that rhythm implies. Measured against 3,692 hand-tapped tracks the estimate
+lands within 2 BPM of the tap 88.7% of the time, which is about as close as the
+same person tapping the same track twice; rhythm classification is 93.6%
+accurate. [docs/tango-analysis.md](docs/tango-analysis.md) has the method and
+the full numbers, and [docs/cortina-genres.md](docs/cortina-genres.md) covers
+the cortina genres that were measured and left alone.
+
+Originally written by Michael Balzer+Holger Stenger as BPM Analyser,
+but bpmcore engine was completely rewritten.
+
 
 Building
 --------
@@ -362,14 +364,6 @@ double samples are accepted. Pass a `bpmcore::listener` for progress and
 cancellation, and a `bpmcore::options` to control threading - the spectral stage
 is over 90% of the run time and is spread across cores by default, with an
 answer that does not depend on the thread count.
-
-References
-----------
-
-1. [Tempo and Beat Estimation of Musical Signals](http://ismir2004.ismir.net/proceedings/p032-page-158-paper191.pdf)
-2. [Onset Detection Revisited](http://www.dafx.ca/proceedings/papers/p_133.pdf)
-3. [A Comparison of Sound Onset Detection Algorithms with Emphasis on Psychoacoustically Motivated Detection Functions](http://www.cogs.susx.ac.uk/users/nc81/research/comparison.pdf)
-4. [Window Functions](http://en.wikipedia.org/wiki/Window_function#Window_examples)
 
 Links
 -----

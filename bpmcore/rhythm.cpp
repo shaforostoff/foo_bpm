@@ -190,6 +190,14 @@ void build_features(const odf & o, const std::vector<float> & novelty,
 
 int classify(const std::vector<double> & features, double * confidence)
 {
+	// Adding a class is exactly the change that can leave the exported model and
+	// the enum disagreeing, and the disagreement is a read off the end of the
+	// baseline rather than anything that shows. Catch it at build time.
+	static_assert(rhythm_model::class_count == rhythm_class_count,
+	              "the exported model has a different number of classes than rhythm_class");
+	static_assert(rhythm_model::feature_count == feature_count,
+	              "the exported model was fitted on a different feature vector");
+
 	if (confidence) *confidence = 0.0;
 	if (static_cast<int>(features.size()) != feature_count) return rhythm_other;
 

@@ -32,15 +32,36 @@ namespace
 	//! prior cannot pull a tempo towards its mean.
 	//!
 	//! `support` is how much the autocorrelation at a level counts against the
-	//! prior. Tango, vals and milonga have priors tight enough to settle the
+	//! prior. The four named rhythms have priors tight enough to settle the
 	//! level on their own; "other" spans bossa to disco and has no useful tempo
 	//! prior, so there the audio is trusted and the prior only breaks ties.
+	//!
+	//! Reggae is the case that shows why a near-flat prior is not enough. What
+	//! a dancer taps there is the quarter note, 64 to 120 across the sides that
+	//! carry a tap; what the grid finds is usually the skank an octave above
+	//! it, and on the two slowest of them the quarter note itself. So the two
+	//! candidate readings differ by a factor of two, the autocorrelation
+	//! supports both almost equally - over 67 sides it favoured the slower by a
+	//! median of 0.017 - and under the "other" prior the answer was a coin toss.
+	//!
+	//! 88 is deliberately above the middle of the tapped values, which is 81. A
+	//! log-normal prior separates two levels at their geometric midpoint,
+	//! mu * sqrt(2), so 88 puts that boundary at 124.5 - between the fastest
+	//! quarter note tapped, 120, and the slowest skank the grid returns, 128.
+	//! Centred on the tapped mean instead it lands at 115, and the two sides
+	//! whose quarter note the grid found directly are read an octave down.
+	//!
+	//! The width stays tight for the same reason the centre is placed rather
+	//! than fitted: the levels are a factor of two apart, so a narrow prior
+	//! separates them by a wider margin, and every tapped side sits within
+	//! three sigma of the centre regardless.
 	struct tempo_prior { double mu; double sigma; double support; };
 	const tempo_prior priors[rhythm_class_count] =
 	{
 		{ 125.5, 0.075, 1.6 },   // tango:   tapped on the beat
 		{  68.5, 0.090, 1.6 },   // vals:    tapped once per 3/4 bar
 		{  52.5, 0.110, 1.6 },   // milonga: tapped once per 2/4 bar
+		{  88.0, 0.115, 1.6 },   // reggae:  tapped on the quarter note, under the skank
 		{ 110.0, 0.450, 6.0 },   // other:   whatever pulse is most salient
 	};
 
@@ -158,6 +179,7 @@ const char * rhythm_name(int cls)
 		case rhythm_tango:   return "Tango";
 		case rhythm_vals:    return "Vals";
 		case rhythm_milonga: return "Milonga";
+		case rhythm_reggae:  return "Reggae";
 		default:             return "Other";
 	}
 }
@@ -477,14 +499,15 @@ double tapped_bpm(const std::vector<double> & r, double beat_lag, int rhythm,
 
 	const double lag = refine_period(r, beat_lag);
 
-	// The three tango rhythms state their own metre, whatever the grid search
-	// made of it. "Other" is everything from chacarera to disco and states
-	// nothing, so there the detected metre decides - which keeps a duple piece
-	// off the two-thirds level. Reading a son at two thirds of its beat was
-	// what put Chan Chan at 112 and Guantanamera at 83.
+	// The named rhythms state their own metre, whatever the grid search made of
+	// it: vals is triple, the rest duple. "Other" is everything from chacarera
+	// to disco and states nothing, so there the detected metre decides - which
+	// keeps a duple piece off the two-thirds level. Reading a son at two thirds
+	// of its beat was what put Chan Chan at 112 and Guantanamera at 83.
+	const bool states_duple = rhythm == rhythm_tango || rhythm == rhythm_milonga ||
+	                          rhythm == rhythm_reggae;
 	const bool triple = rhythm == rhythm_vals ||
-	                    (rhythm != rhythm_tango && rhythm != rhythm_milonga &&
-	                     (meter == 3 || meter == 6));
+	                    (!states_duple && (meter == 3 || meter == 6));
 
 	const double * levels = triple ? levels_triple : levels_duple;
 	const std::size_t level_count = triple

@@ -2,7 +2,7 @@
 """Shared ground-truth labelling for the tango collections."""
 import json, os, re
 
-CLASSES = ['tango', 'vals', 'milonga', 'other']
+CLASSES = ['tango', 'vals', 'milonga', 'reggae', 'other']
 
 
 def parse_bpm(rec):
@@ -40,6 +40,16 @@ _RULES = [
                  'vals serenata', 'valsecito', 'vals', 'waltz', 'walzer']),
     ('tango',   ['tango cancion', 'tango sinfonico', 'tango canyengue', 'tango negro',
                  'tango campero', 'tango electronico', 'tango nuevo', 'tango']),
+    ('reggae',  ['roots reggae', 'rocksteady', 'rock steady', 'reggae']),
+]
+
+# The one place a directory names the rhythm. Everywhere else the path is
+# deliberately ignored - a collection folder is named after the collection, so
+# matching on it would call every pasodoble under C:/TangoTunes a tango - but
+# this folder is named after the music in it and was confirmed to hold nothing
+# else. It has to be consulted: only 25 of the 67 sides in it carry a genre tag.
+_FOLDERS = [
+    ('reggae', ['cortinas/reggae']),
 ]
 
 _ACC = str.maketrans('áàâäãéèêëíìîïóòôöõúùûüñç', 'aaaaaeeeeiiiiooooouuuunc')
@@ -61,10 +71,16 @@ def _match(text):
 def label(rec):
     """Ground-truth rhythm class from the genre tag, falling back to the file name.
 
-    The full path is deliberately NOT used: a collection directory is usually
-    named after the music in it, so every file under a "TangoTunes" folder would
-    otherwise match 'tango' - including the pasodobles and foxtrots.
+    The full path is deliberately NOT used, bar the folders in `_FOLDERS`: a
+    collection directory is usually named after the music in it, so every file
+    under a "TangoTunes" folder would otherwise match 'tango' - including the
+    pasodobles and foxtrots.
     """
+    p = rec['path'].replace(os.sep, '/').replace('\\', '/').lower()
+    for cls, folders in _FOLDERS:
+        for f in folders:
+            if '/' + f + '/' in p:
+                return cls, 'folder'
     g = rec.get('genre')
     if g:
         m = _match(g)

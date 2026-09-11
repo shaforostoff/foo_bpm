@@ -12,7 +12,7 @@ import config
 import tango_labels as T, features as F
 from sklearn.ensemble import HistGradientBoostingClassifier
 
-CLS = ['tango', 'vals', 'milonga', 'other']
+CLS = T.CLASSES
 OUT = config.MODEL_HEADER
 
 
@@ -87,7 +87,8 @@ def main():
     b.append('// Produced by scripts/train_rhythm_model.py; see docs/tango-analysis.md.')
     b.append('//')
     b.append('// Gradient boosted decision trees over the features built by')
-    b.append('// bpmcore::build_features. Class order is Tango, Vals, Milonga, other,')
+    b.append('// bpmcore::build_features. Class order is '
+             + ', '.join(c.capitalize() for c in CLS) + ',')
     b.append('// matching bpmcore::rhythm_class.')
     b.append('//')
     b.append(f'// Fitted on {X.shape[0]} hand-labelled tracks, {X.shape[1]} features,')
@@ -112,6 +113,7 @@ def main():
     b.append('\t};')
     b.append('')
     b.append(f'\tconst int feature_count = {X.shape[1]};')
+    b.append(f'\tconst int class_count = {n_cls};')
     b.append(f'\tconst int tree_count = {len(offsets)};')
     b.append(f'\tconst int node_count = {len(flat)};')
     b.append('')
@@ -145,6 +147,14 @@ def main():
 
     # Reference features + expected output, for the C++ parity test.
     sel = list(range(0, len(paths), max(1, len(paths) // 60)))[:60]
+    # An even stride over a set this lopsided can miss a small class entirely -
+    # reggae is 68 of 12,165 - and then nothing checks that the C++ agrees about
+    # what that class is called. Top up to two cases each.
+    for c in range(len(CLS)):
+        have = [i for i in sel if y[i] == c]
+        for i in np.flatnonzero(y == c)[:max(0, 2 - len(have))]:
+            sel.append(int(i))
+    sel = sorted(set(sel))
     cases = config.REFERENCE_CASES
     with open(cases, 'w', encoding='utf-8') as fh:
         for i in sel:

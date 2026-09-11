@@ -4,34 +4,44 @@ Tango tempo and rhythm analysis
 How `bpmcore` works, why it is built the way it is, and how well it does.
 
 The short version: the tempo a dancer taps is not a property of the audio alone
-— it depends on which rhythm is playing, because tango, vals and milonga are
-tapped on different metrical levels. So the analysis settles the rhythm first
-and reports the tempo on the level that rhythm implies.
+— it depends on which rhythm is playing, because tango, vals, milonga and
+reggae are tapped on different metrical levels. So the analysis settles the
+rhythm first and reports the tempo on the level that rhythm implies.
 
 
 What the reference data says
 ----------------------------
 
-Everything here was derived from and measured against a collection of about
-12,000 tracks with genre tags, of which **3,664 carry a hand-tapped BPM**. The
-tapping is the ground truth for tempo; the genre tag is the ground truth for
-rhythm, and is never consulted at analysis time.
+Everything here was derived from and measured against a collection of 12,160
+tracks with genre tags, of which **3,692 carry a hand-tapped BPM**. The tapping
+is the ground truth for tempo; the genre tag is the ground truth for rhythm,
+and is never consulted at analysis time.
 
 Two things fell out of the tapped values immediately.
 
 **The tapping convention differs per rhythm.** Grouped by genre, the hand-tapped
-values are strikingly tight, and they sit on three different metrical levels:
+values are strikingly tight, and they sit on four different metrical levels:
 
 | rhythm  |   n  | median | p5–p95  | what is being tapped        |
 |---------|-----:|-------:|---------|-----------------------------|
-| tango   | 2732 |    126 | 116–136 | the beat (quarter note)     |
+| tango   | 2733 |    125 | 116–136 | the beat (quarter note)     |
 | vals    |  455 |     69 |  58–76  | the 3/4 bar                 |
 | milonga |  425 |     53 |  41–59  | the 2/4 bar                 |
+| reggae  |   14 |     78 |  67–100 | the quarter note, under the skank |
 
 Anchoring on the tapped value itself and asking which multiple of that period
 the autocorrelation likes best confirms it: for tango the tapped period *is* the
 strongest short periodicity, for vals the audio's beat sits at one third of it,
-and for milonga at one half or one quarter.
+for milonga at one half or one quarter, and for reggae — usually — at one half.
+
+Reggae is a late addition and its taps need a word. Two more were supplied by
+hand for sides that carry no BPM tag, *Rivers of Babylon* at 105 and *Kingston
+Town* at 102, which makes 16; the table above counts only the 14 the tags hold,
+but the prior below was placed using all of them, and the two are what placed
+it. On 14 of the 16 the beat the grid returns is within 3 BPM of exactly twice
+the tap, and on the other two — the two slowest sides — it *is* the tap. What
+is being tapped is the quarter note throughout; what varies is whether the grid
+locked onto the quarter note or onto the skank an octave above it.
 
 **Human tapping repeats to about ±2 BPM.** 469 recordings appear more than once
 in the collection — a shellac transfer, a declicked copy, a different
@@ -125,7 +135,7 @@ harmonics are not.
 * novelty curve kurtosis and skew: a sharply articulated marcato and a smooth
   legato line look very different at the same tempo.
 
-Gradient boosted trees over those features (150 iterations, 15 leaves, four
+Gradient boosted trees over those features (150 iterations, 15 leaves, five
 classes). Logistic regression on the same features reaches only 85% — the
 interactions are real — so the trees are exported verbatim into
 `bpmcore/rhythm_model.h` and walked directly. Thresholds and leaf values are
@@ -144,6 +154,34 @@ apart. **The value itself always comes from the autocorrelation peak**, so a
 prior cannot pull a tempo towards its mean. That separation is deliberate: the
 priors are tight (tango is 125.5 with a log sigma of 0.075) and would otherwise
 flatten every tango to the same number.
+
+**A near-flat prior does not settle an octave.** Reggae is the case that shows
+it. The tap is the quarter note and the grid usually returns the skank an
+octave above it, so the two readings differ by a factor of two — and the
+autocorrelation supports both almost equally: across 67 reggae sides the two
+differ by a median of −0.017, the slower reading being fractionally the better
+supported. Under the "other" prior the scores came out within a few hundredths
+of each other and the answer was effectively a coin toss; *Ethiopia* scored
+3.844 at 141.6 against 3.822 at 70.8, and was tapped at 70. A class with a
+prior of its own is what settles that, and is why reggae is a class at all
+rather than a label.
+
+**A prior's centre is a boundary, not an average.** Reggae's is 88, which is
+above the middle of its own tapped values, 81. A log-normal prior separates two
+metrical levels at their geometric midpoint, `mu * sqrt(2)`, so 88 places that
+boundary at 124.5 — between the fastest quarter note tapped, 120, and the
+slowest skank the grid returns for a tapped side, 128. Centred on the tapped mean instead the
+boundary lands at 115, and the two sides whose quarter note the grid found
+directly are reported an octave down; fitted to the 13 taps that cluster at
+64–90, as it first was, the boundary lands at 107 and takes a third side with
+it. Sweeping the centre from 76 to 95, only 86 to 90 puts all 16 on the level they
+were tapped at; 88 sits in the middle of that window and wins its levels by
+nearly twice the margin 86 does and forty times the margin 90 does.
+
+The width, 0.115, is narrower than the tapped spread of 0.17. That is also
+deliberate: the levels being a factor of two apart, a narrow prior separates
+them by a wider margin, and every tapped side still sits within three sigma of
+the centre.
 
 **The levels on offer have to be levels of the metre.** Two beats is not a
 metrical position in a 3/4 bar, and while it was offered a slow vals could be
@@ -174,36 +212,94 @@ heavily, and many sides exist as a transfer, a declicked copy and a retuned
 copy):
 
 ```
-n=12118   accuracy=94.13%   balanced=88.37%
+n=12160   accuracy=93.63%   balanced=78.97%
 
-actual        tango     vals  milonga    other   recall
-tango          8386       23       18       96    98.4%
-vals             21      927        6       52    92.1%
-milonga          64       12      624       53    82.9%
-other           199       97       70     1470    80.1%
-precision     96.7%    87.5%    86.9%    88.0%
+actual        tango     vals  milonga   reggae    other   recall
+tango          8369       23       18        1      112    98.2%
+vals             20      932        8        0       46    92.6%
+milonga          69       13      617        0       54    81.9%
+reggae            1        0        0       29       38    42.6%
+other           194      100       72        6     1438    79.4%
+precision     96.7%    87.3%    86.3%    80.6%    85.2%
 ```
 
-Restricted to the tango-era collections alone — where every track is a shellac
-transfer, so recording quality cannot be doing the work — accuracy is 94.61%,
-with tango/vals/milonga recall at 98.5 / 92.3 / 83.0%.
+Fitting four classes on the same tracks and the same folds, with reggae folded
+back into "other", is what the model was before and gives 94.22% accuracy,
+88.42% balanced:
 
-BPM against the 3,664 hand-tapped tracks, using the **predicted** rhythm:
+```
+actual        tango     vals  milonga    other   recall
+tango          8396       17       16       94    98.5%
+vals             22      922        9       53    91.7%
+milonga          69       11      624       49    82.9%
+other           201       91       71     1515    80.7%
+precision     96.6%    88.6%    86.7%    88.5%
+```
+
+So the fifth class costs 0.6 points of accuracy. The balanced figure falls
+much further, from 88.42% to 78.97%, but that is arithmetic rather than
+regression: it is the mean of the per-class recalls, and reggae's 42.6% is now
+one of five terms where before it was not a term at all.
+
+What it costs the existing classes is easy to overstate from the diagonals.
+Tango ends 27 sides worse, milonga 7, vals 10 better — but those are net
+figures over a much larger churn: 45 tango sides changed class and 18 changed
+back, 21 milongas moved out and 14 in, 14 vals out and 24 in. **Reggae takes
+seven tracks in the whole collection**, one of them a tango — Juan D'Arienzo's
+1971 *La cumparsita (fast)*, now read at 69.9 where it was 139.2. The other
+~130 moves are between the four classes that were already there, and are
+refitting noise rather than anything reggae did. That is measured, not assumed:
+refitting the **four**-class model under a different fold split - a nuisance
+change that cannot mean anything - moves 287 of the 12,160 tracks, and adding
+the fifth class moves 301. Per class the two are the same size: 65 tango
+against 73, 55 vals against 44, 57 milongas against 61, 110 "other" against
+123. Milonga recall reads 82.60% and 83.13% under those two four-class splits
+and 81.9% with reggae, so what the class costs milonga is about half again the
+swing between two arbitrary splits of the model without it.
+
+Reggae is not what moves them, either. Over all 753 milongas the five-class
+model gives reggae a mean probability of 0.0001 and never ranks it even second;
+the probability those 21 milongas lose goes to "other", which is where a
+borderline milonga has always gone. Measured where it matters — against the hand taps — the whole churn is
+close to a wash. 18 tapped tracks land closer to their tap and 15 further, and
+five of the 18 are reggae sides, so the four original classes come out slightly
+behind and well inside the noise of a refit.
+
+The tracks that move furthest are the ones whose two candidate levels are both
+defensible: three copies of Biagi's *Pajaro herido* go from 70.6 to 105.7
+against a tap of 70, and two of D'Arienzo's *Milonga vieja milonga* from 49.2
+to 98.0 against a tap of 50, while D'Arienzo's *Irene* goes from 109.7 to 73.3
+against a tap of 73 and Fresedo's *Vuelves* from 63.8 to 127.1 against 129. A
+refit moves a handful of those either way; none of it is a property of the new
+class.
+
+Restricted to the tango-era collections alone — where every track is a shellac
+transfer, so recording quality cannot be doing the work — accuracy is 94.49%,
+against 94.74% for four classes, with tango/vals/milonga recall at
+98.3 / 92.8 / 82.0%. No reggae is labelled in those collections and one track
+was called reggae across all of them.
+
+BPM against the 3,692 hand-tapped tracks, using the **predicted** rhythm:
 
 | rhythm  |   n  | exact | ≤1 BPM | ≤2 BPM | ≤3 BPM | right level |
 |---------|-----:|------:|-------:|-------:|-------:|------------:|
-| tango   | 2732 | 34.6% |  74.6% |  88.4% |  93.8% |       98.3% |
-| vals    |  455 | 43.5% |  86.4% |  94.1% |  94.5% |       94.9% |
-| milonga |  425 | 41.4% |  81.2% |  88.2% |  89.2% |       89.2% |
-| other   |   52 | 34.6% |  71.2% |  80.8% |  82.7% |       84.6% |
-| **all** | 3664 | 36.5% |  76.8% |  89.0% |  93.2% |       96.6% |
+| tango   | 2733 | 35.3% |  74.6% |  88.4% |  93.7% |       98.3% |
+| vals    |  455 | 44.4% |  87.5% |  95.2% |  95.6% |       96.0% |
+| milonga |  425 | 41.2% |  79.8% |  86.8% |  87.5% |       87.5% |
+| reggae  |   14 | 21.4% |  64.3% |  64.3% |  64.3% |       64.3% |
+| other   |   65 | 35.4% |  69.2% |  76.9% |  80.0% |       83.1% |
+| **all** | 3692 | 37.1% |  76.7% |  88.7% |  92.9% |       96.4% |
+
+Reggae was 28.6% within 2 BPM under four classes and is 64.3% under five. The
+whole-collection figure is unchanged at 88.7%: tango and vals are flat or
+slightly better, milonga gives up 0.7 points and "other" 1.6.
 
 Set against the tap-to-tap repeatability above (68% within 1, 84% within 2, 93%
 within 3), the estimator agrees with a tap about as closely as the same person
 tapping twice.
 
 The rhythm classifier is what buys most of this. Skipping it and treating every
-track as a tango gives 66.9% within 2 BPM instead of 89.0%.
+track as a tango gives 66.7% within 2 BPM instead of 88.7%.
 
 ### Where it still misses
 
@@ -223,6 +319,28 @@ track as a tango gives 66.9% within 2 BPM instead of 89.0%.
   vs 65.4% within 2 BPM): the candombes tagged "other" get classified as
   milonga, and the milonga prior then puts them on the level they were actually
   tapped on.
+* **Reggae recall, 43%.** 68 labelled sides against tango's 8,523 is not much
+  to fit a class on, and the 57% that are missed simply behave as they did
+  before — they fall to "other" and take the old octave decision, which is the
+  safe direction to fail in. Precision is the figure that matters here and it
+  is 80.6%: seven tracks in 12,160 are called reggae and are not. At least one
+  of those is arguable rather than wrong — Grace Jones, *I've Seen That Face
+  Before*, is Compass Point reggae in everything but the tag — so both figures
+  are understated by however much unlabelled reggae sits in "other". More
+  labelled examples is the only real remedy.
+
+  The one that costs something is a tango called reggae, because the reggae
+  prior then halves it. A tango's beat is 110-140 and a reggae's skank is
+  125-180, so the two overlap at the fast end and that is where it can happen.
+  One side in 8,523 did, held out: D'Arienzo's 1971 *La cumparsita (fast)*, a
+  transfer running over speed, which the fitted model itself calls tango at
+  139.2.
+* **Reggae slower than about 62 to the quarter note.** The prior separates the
+  levels at 124.5, which sits just under the slowest skank in the collection,
+  128. A side whose skank fell below that — a quarter note under 62 — would be
+  reported at the skank rather than at the tap. Nothing in the collection is
+  that slow, and the boundary cannot be lowered without giving up the sides
+  whose quarter note the grid finds directly, at 102 and 120.
 * **Beat search floor, ~96 BPM.** Eight multiples of the beat have to fit inside
   the five-second autocorrelation. Every rhythm here sits well above that — a
   tango beat is 110–140, a vals beat around 205 — but a genuinely slow piece is

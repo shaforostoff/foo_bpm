@@ -11,8 +11,9 @@
 // Two things come out of one pass over a track:
 //
 //   * the tempo, expressed on the metrical level a dancer taps - the beat for
-//     a tango, the bar for a vals or a milonga;
-//   * which of those three rhythms it is, or none of them.
+//     a tango, the bar for a vals or a milonga, the quarter note beneath
+//     the skank for a reggae;
+//   * which of those four rhythms it is, or none of them.
 //
 // The two are not independent. Deciding the tapped level needs the rhythm, so
 // the classifier runs first and the tempo is reported on the level that rhythm
@@ -32,11 +33,12 @@ enum rhythm_class
 	rhythm_tango = 0,
 	rhythm_vals,
 	rhythm_milonga,
+	rhythm_reggae,
 	rhythm_other,
 	rhythm_class_count
 };
 
-//! "Tango", "Vals", "Milonga" or "Other". Never null.
+//! "Tango", "Vals", "Milonga", "Reggae" or "Other". Never null.
 const char * rhythm_name(int cls);
 
 struct analysis

@@ -6,6 +6,44 @@ Change Log
 
 ### Version 0.1.0
 
+* **Reggae is a fifth rhythm**, beside Tango, Vals and Milonga. It is there for
+  the tempo rather than for the label: what a dancer taps in a reggae is the
+  quarter note, and what the grid returns is usually the skank an octave above
+  it, so the two candidate readings differ by a factor of two. The old
+  four-class model had no prior that could choose between them - "other" spans
+  bossa to disco and its prior is deliberately near-flat - and across 67 reggae
+  sides the autocorrelation supported the two levels within a median of 0.017 of
+  each other. The answer was a coin toss, and it landed on double the tapped
+  tempo on 10 of the 14 sides that carry a hand tap. With a prior of its own it
+  is 9 of those 14 cross-validated, up from 4, and all seven of the sides the
+  classifier actually calls reggae are right; on the built component, over all
+  16 sides there is now a tap for, 15.
+* The reggae prior is centred at 88 BPM rather than at the 81 its own taps
+  average, because a prior's centre is a boundary and not an average: a
+  log-normal separates two metrical levels at `mu * sqrt(2)`, and 88 puts that
+  at 124.5 - between the fastest quarter note tapped, 120, and the slowest
+  skank the grid returns, 128. Centred on the average it reads *Kingston Town*,
+  *Mark Of Slavery* and *Is This Love* an octave down.
+* Reggae recall is 43% cross-validated, from 68 labelled examples against
+  tango's 8,523. A side it misses behaves exactly as it did before, so the
+  failure is quiet; precision, which is the figure that can do harm, is 80.6%.
+  Classification overall went from 94.2% to 93.6% and BPM within 2 BPM of the
+  tap is unchanged at 88.7%.
+* Tango ends 27 sides worse and milonga 7, vals 10 better, but reggae is not
+  what moved them: it takes seven tracks in the whole collection, one of them a
+  tango. Those net figures sit on top of a churn of about 130 sides between the
+  four classes that already existed, which is what refitting does: refitting the
+  four-class model under a different fold split, which cannot mean anything,
+  moves 287 of the 12,160 tracks where adding the fifth moves 301. Reggae takes
+  no milongas at all - over all 753 of them the model gives it a mean
+  probability of 0.0001 and never ranks it second. Against the hand taps 18 tracks land closer and 15
+  further, five of the 18 being reggae. `docs/tango-analysis.md` has both
+  confusion matrices and the tracks that moved furthest.
+* Disco, funk, cumbia and salsa were measured at the same time and left alone.
+  They are already reported at the tempo they are tapped at, so a class would
+  buy a name and not a number, and the metrical features cannot separate them
+  anyway - 3 to 18% recall against reggae's 43%. `docs/cortina-genres.md`
+  records what was measured and what it would take.
 * Renamed. BPM Analyser is now Rubato BPM Analyzer, the component is
   `foo_rubato.dll` rather than `foo_bpm.dll`, and the version starts again at
   0.1.0. Nothing about the analysis changed with the name; 0.4.2 below and

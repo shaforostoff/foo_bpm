@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from concurrent.futures import ProcessPoolExecutor
 import config
 import dataset as D, features as F, tempo as TP, predict_bpm as P
+import tango_labels as T
 
 
 def base_key(p):
@@ -23,7 +24,7 @@ def work(path):
     try:
         f, r, g = F.extract(o)
         # BPM under each class hypothesis, so evaluation can mix and match later
-        bp = {c: P.predict(o, c, r, g)[0] for c in ['tango', 'vals', 'milonga', 'other']}
+        bp = {c: P.predict(o, c, r, g)[0] for c in T.CLASSES}
         return path, f, bp
     except Exception as e:
         return path, None, str(e)[:120]

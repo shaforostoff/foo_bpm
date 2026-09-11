@@ -23,7 +23,10 @@ repository) and `TANGO_FFMPEG` if ffmpeg is not on the PATH.
 ```bash
 # 1. Read tags from every collection. Genre is the rhythm ground truth; an
 #    integer BPM is a hand tap, a fractional one is machine written and ignored.
-python scan_tags.py C:\TangoTunes C:\SortedTangoSpanishNames C:\cortinas
+#    All five roots: the figures in docs/tango-analysis.md are over the lot,
+#    and leaving two out fits on 10,189 tracks rather than 12,165.
+python scan_tags.py C:\TangoTunes C:\SortedTangoSpanishNames \
+                    C:\SortedTangoSpanishNamesFLAC C:\chacarera C:\cortinas
 
 # 2. Decode everything once and cache the band onset envelope. This is the slow
 #    step - about an hour for 12,000 tracks - and is restartable.
